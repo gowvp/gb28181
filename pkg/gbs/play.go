@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/gowvp/gb28181/internal/core/gb28181"
@@ -59,8 +60,10 @@ func (g *GB28181API) StopPlay(in *StopPlayInput) error {
 
 func (g *GB28181API) Play(in *PlayInput) error {
 	log := slog.With("deviceID", in.Channel.DeviceID, "channelID", in.Channel.ChannelID)
+	log.Info("开始播放流程")
 	ch, ok := g.svr.memoryStorer.GetChannel(in.Channel.DeviceID, in.Channel.ChannelID)
 	if !ok {
+		log.Error("通道不存在")
 		return ErrChannelNotExist
 	}
 
@@ -105,6 +108,54 @@ func (g *GB28181API) Play(in *PlayInput) error {
 	return nil
 }
 
+// GetIP 判断输入字符串并返回对应的IP地址
+// 输入可能是IPv4地址、域名、空值或其他非法值
+func GetIP(input string) (string, error) {
+	slog.Info("开始域名解析", "输入", input)
+	// 处理空字符串情况
+	if input == "" {
+		slog.Error("输入为空字符串")
+		return input, fmt.Errorf("输入为空")
+	}
+
+	// 去除前后空格
+	input = strings.TrimSpace(input)
+
+	// 首先尝试直接解析为IPv4地址
+	if ip := net.ParseIP(input); ip != nil {
+		// 检查是否是IPv4地址
+		if ip.To4() != nil {
+			return ip.String(), nil
+		}
+		// 如果是IPv6地址，记录错误
+		slog.Error("不支持的IPv6地址", "输入", input)
+		return input, fmt.Errorf("IPv6地址暂不支持")
+	}
+
+	// 尝试解析为域名
+	ips, err := net.LookupIP(input)
+	if err != nil {
+		slog.Error("域名解析失败", "域名", input, "错误", err)
+		return input, fmt.Errorf("无法解析域名: %w", err)
+	}
+
+	// 从解析结果中优先选择IPv4地址
+	for _, ip := range ips {
+		if ip.To4() != nil {
+			return ip.To4().String(), nil
+		}
+	}
+
+	// 如果没有IPv4地址，选择第一个IPv6地址（如果有）
+	if len(ips) > 0 {
+		slog.Warn("域名只解析到IPv6地址", "域名", input)
+		return ips[0].String(), nil
+	}
+
+		slog.Error("域名没有解析到任何IP地址", "域名", input)
+	return input, fmt.Errorf("域名没有解析到IP地址")
+}
+
 func (g *GB28181API) sipPlayPush2(ch *Channel, in *PlayInput, port int, stream *Streams) error {
 	name := "Play"
 	protocal := "TCP/RTP/AVP"
@@ -139,19 +190,30 @@ func (g *GB28181API) sipPlayPush2(ch *Channel, in *PlayInput, port int, stream *
 	video.AddAttribute("rtpmap", "97", "MPEG4/90000")
 	video.AddAttribute("rtpmap", "98", "H264/90000")
 
+	//获取配置值
+	ipstr := in.SMS.GetSDPIP()
+	//进行IP解析
+	ip4str, err := GetIP(ipstr)
+
+	if err != nil {
+		slog.Error("域名解析失败", "域名", ipstr, "错误", err)
+		return err
+	}
+	slog.Info("域名解析成功", "原始域名", ipstr, "解析IP", ip4str)
+
 	// defining message
 	msg := &sdp.Message{
 		Origin: sdp.Origin{
 			Username:    ch.ChannelID, // 媒体服务器id
 			NetworkType: "IN",
 			AddressType: "IP4",
-			Address:     in.SMS.GetSDPIP(),
+			Address:     ip4str,
 		},
 		Name: name,
 		Connection: sdp.ConnectionData{
 			NetworkType: "IN",
 			AddressType: "IP4",
-			IP:          net.ParseIP(in.SMS.GetSDPIP()),
+			IP:          net.ParseIP(ip4str),
 		},
 		Timing: []sdp.Timing{
 			{
