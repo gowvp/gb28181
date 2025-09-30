@@ -36,3 +36,4 @@ tables/
 .idea/
 data/
 cover/
+*.pprof
