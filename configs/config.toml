@@ -22,11 +22,13 @@
       AccessIps = ['::1', '127.0.0.1']
 
 [Data]
-  # 数据库支持 sqlite 和 postgres 两种，使用 sqlite 时 dsn 应当填写文件存储路径
+  # 数据库支持 sqlite/postgres/mysql ，使用 sqlite 时 dsn 应当填写文件存储路径
+  # postgres://postgres:123456@127.0.0.1:5432/gb28181?sslmode=disable
+  # mysql://root:123456@127.0.0.1:5432/gb28181?sslmode=disable
   [Data.Database]
     Dsn = './configs/data.db'
-    MaxIdleConns = 1
-    MaxOpenConns = 1
+    MaxIdleConns = 10
+    MaxOpenConns = 50
     ConnMaxLifetime = '6h0m0s'
     SlowThreshold = '200ms'
 

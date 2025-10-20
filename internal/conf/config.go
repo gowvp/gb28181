@@ -41,7 +41,7 @@ type ServerPPROF struct {
 // Data 结构体，包含 Database 和 Redis 两个字段
 type Data struct {
 	// Database 数据库
-	Database Database `comment:"数据库支持 sqlite 和 postgres 两种，使用 sqlite 时 dsn 应当填写文件存储路径"`
+	Database Database `comment:"数据库支持 sqlite/postgres/mysql, 使用 sqlite 时 dsn 应当填写文件存储路径"`
 	// Redis Redis数据库
 	// Redis DataRedis
 }

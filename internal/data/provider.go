@@ -10,6 +10,7 @@ import (
 	"github.com/gowvp/gb28181/internal/conf"
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/system"
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -36,11 +37,15 @@ func SetupDB(c *conf.Bootstrap, l *slog.Logger) (*gorm.DB, error) {
 
 // getDialector 返回 dial 和 是否 sqlite
 func getDialector(dsn string) (gorm.Dialector, bool) {
-	if strings.HasPrefix(dsn, "postgres") {
+	switch true {
+	case strings.HasPrefix(dsn, "postgres"):
 		return postgres.New(postgres.Config{
 			DriverName: "pgx",
 			DSN:        dsn,
 		}), false
+	case strings.HasPrefix(dsn, "mysql"):
+		return mysql.Open(dsn), false
+	default:
+		return sqlite.Open(filepath.Join(system.Getwd(), dsn)), true
 	}
-	return sqlite.Open(filepath.Join(system.Getwd(), dsn)), true
 }

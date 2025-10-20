@@ -213,7 +213,7 @@ services:
 - [x] 支持输出 HTTP_FLV,Websocket_FLV,HLS,WebRTC,RTSP、RTMP 等多种协议流地址
 - [x] 支持局域网/互联网/多层 NAT/特殊网络环境部署
 - [x] 支持 SQLite 数据库快速部署
-- [x] 支持 PostgreSQL 数据库
+- [x] 支持 PostgreSQL/MySQL 数据库
 - [x] 服务重启自动离线/自动尝试连接
 - [x] GB/T 28181
   - [x] 设备注册，支持 7 种接入方式
