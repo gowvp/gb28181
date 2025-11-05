@@ -279,6 +279,21 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 		},
 	}
 
+	prefix := c.Request.Header.Get("X-Forwarded-Prefix")
+	if prefix != "" {
+		wsPrefix := strings.Replace(strings.Replace(prefix, "https", "wss", 1), "http", "ws", 1)
+		out.Items[0].WSFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", wsPrefix, stream) + "?" + session
+		out.Items[0].HTTPFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", prefix, stream) + "?" + session
+
+		host := c.Request.Header.Get("X-Forwarded-Host")
+		out.Items[0].RTMP = fmt.Sprintf("rtmp://%s:%d/proxy/sms/%s.live.flv", host, svr.Ports.RTMP, stream) + "?" + session
+		out.Items[0].RTSP = fmt.Sprintf("rtsp://%s:%d/proxy/sms/%s.live.flv", host, svr.Ports.RTSP, stream) + "?" + session
+		out.Items[0].HLS = fmt.Sprintf("%s/proxy/sms/%s/hls.fmp4.m3u8", prefix, stream) + "?" + session
+		rtcPrefix := strings.Replace(strings.Replace(prefix, "https", "webrtc", 1), "http", "webrtc", 1)
+		out.Items[0].WebRTC = fmt.Sprintf("%s/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", rtcPrefix, app, stream) + "&" + session
+
+	}
+
 	// 取一张快照
 	go func() {
 		body, err := a.uc.SMSAPI.smsCore.GetSnapshot(svr, zlm.GetSnapRequest{
@@ -309,11 +324,16 @@ func (a GB28181API) refreshSnapshot(c *gin.Context, in *refreshSnapshotInput) (a
 
 	token := c.GetString("token")
 
+	prefix := web.GetBaseURL(c.Request)
+	if v := c.Request.Header.Get("X-Forwarded-Prefix"); v != "" {
+		prefix = v
+	}
+
 	// 获取文件的修改时间
 	fileInfo, err := os.Stat(path)
 	if err == nil {
 		if fileInfo.ModTime().Unix() > time.Now().Unix()-in.WithinSeconds {
-			return gin.H{"link": fmt.Sprintf("%s/channels/%s/snapshot?token=%s", web.GetBaseURL(c.Request), channelID, token)}, nil
+			return gin.H{"link": fmt.Sprintf("%s/channels/%s/snapshot?token=%s", prefix, channelID, token)}, nil
 		}
 	}
 
@@ -338,7 +358,7 @@ func (a GB28181API) refreshSnapshot(c *gin.Context, in *refreshSnapshotInput) (a
 		}
 	}
 
-	return gin.H{"link": fmt.Sprintf("%s/channels/%s/snapshot?token=%s", web.GetBaseURL(c.Request), channelID, token)}, nil
+	return gin.H{"link": fmt.Sprintf("%s/channels/%s/snapshot?token=%s", prefix, channelID, token)}, nil
 }
 
 func (a GB28181API) getSnapshot(c *gin.Context) {
