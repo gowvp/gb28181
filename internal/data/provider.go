@@ -1,7 +1,6 @@
 package data
 
 import (
-	"log/slog"
 	"path/filepath"
 	"strings"
 
@@ -19,19 +18,19 @@ import (
 var ProviderSet = wire.NewSet(SetupDB)
 
 // SetupDB 初始化数据存储
-func SetupDB(c *conf.Bootstrap, l *slog.Logger) (*gorm.DB, error) {
+func SetupDB(c *conf.Bootstrap) (*gorm.DB, error) {
 	cfg := c.Data.Database
 	dial, isSQLite := getDialector(cfg.Dsn)
 	if isSQLite {
 		cfg.MaxIdleConns = 1
 		cfg.MaxOpenConns = 1
 	}
-	db, err := orm.New(true, dial, orm.Config{
+	db, err := orm.New(dial, orm.Config{
 		MaxIdleConns:    int(cfg.MaxIdleConns),
 		MaxOpenConns:    int(cfg.MaxOpenConns),
 		ConnMaxLifetime: cfg.ConnMaxLifetime.Duration(),
 		SlowThreshold:   cfg.SlowThreshold.Duration(),
-	}, orm.NewLogger(l, c.Debug, cfg.SlowThreshold.Duration()))
+	})
 	return db, err
 }
 

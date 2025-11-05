@@ -30,7 +30,11 @@ func (c *Core) FindChannel(ctx context.Context, in *FindChannelInput) ([]*Channe
 
 	query := orm.NewQuery(1)
 	query.OrderBy("channel_id ASC")
-	if in.DeviceID != "" {
+
+	switch true {
+	case in.DID != "":
+		query.Where("did=?", in.DID)
+	case in.DeviceID != "":
 		query.Where("device_id = ?", in.DeviceID)
 	}
 	if in.Key != "" {
@@ -39,9 +43,6 @@ func (c *Core) FindChannel(ctx context.Context, in *FindChannelInput) ([]*Channe
 		} else {
 			query.Where("channel_id like ? OR name like ?", "%"+in.Key+"%", "%"+in.Key+"%")
 		}
-	}
-	if in.DID != "" {
-		query.Where("did=?", in.DID)
 	}
 
 	if in.IsOnline == "true" || in.IsOnline == "false" {

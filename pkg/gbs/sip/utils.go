@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -164,15 +165,20 @@ func GetRequest(url string) ([]byte, error) {
 
 // XMLDecode 解码 xml
 func XMLDecode(data []byte, v interface{}) error {
-	if err := xmlDecode(data, v); err == nil {
+	decoder := xml.NewDecoder(bytes.NewReader(data))
+	decoder.CharsetReader = func(charset string, input io.Reader) (io.Reader, error) {
+		if utf8.Valid(data) {
+			return input, nil
+		}
+		return simplifiedchinese.GB18030.NewDecoder().Reader(input), nil
+	}
+	if err := decoder.Decode(v); err == nil {
 		return nil
 	}
-	// 有些body xml发送过来的不带encoding ，而且格式不是utf8的，导致xml解析失败，此处使用gbk转utf8后再次尝试xml解析
-	body, err := GbkToUtf8(data)
-	if err != nil {
-		return err
-	}
-	return xmlDecode(body, v)
+	value := string(data)
+	value = strings.Replace(value, `<?xml version="1.0"?>`, `<?xml version="1.0" encoding="GB2312"?>`, 1)
+	value = strings.Replace(value, `UTF-8`, `GB2312`, 1)
+	return xmlDecode([]byte(value), v)
 }
 
 func xmlDecode(data []byte, v interface{}) error {

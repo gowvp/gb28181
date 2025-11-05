@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,15 +70,13 @@ func registerGB28181(g gin.IRouter, api GB28181API, handler ...gin.HandlerFunc) 
 	})
 	{
 		group := g.Group("/devices", handler...)
-		group.GET("", web.WrapH(api.findDevice))
-		group.GET("/:id", web.WrapH(api.getDevice))
-		group.PUT("/:id", web.WrapH(api.editDevice))
-		group.POST("", web.WrapH(api.addDevice))
-		group.DELETE("/:id", web.WrapH(api.delDevice))
-
-		group.POST("/:id/catalog", web.WrapH(api.queryCatalog)) // 刷新通道
-
-		group.GET("/channels", web.WrapH(api.FindChannelsForDevice))
+		group.GET("", web.WrapH(api.findDevice))                     // 设备列表
+		group.GET("/:id", web.WrapH(api.getDevice))                  // 设备详情
+		group.PUT("/:id", web.WrapH(api.editDevice))                 // 修改设备详情
+		group.POST("", web.WrapH(api.addDevice))                     // 添加设备
+		group.DELETE("/:id", web.WrapH(api.delDevice))               // 删除设备
+		group.POST("/:id/catalog", web.WrapH(api.queryCatalog))      // 刷新通道
+		group.GET("/channels", web.WrapH(api.FindChannelsForDevice)) // 设备与通道列表
 	}
 
 	{
@@ -130,6 +129,12 @@ func (a GB28181API) queryCatalog(c *gin.Context, _ *struct{}) (any, error) {
 
 func (a GB28181API) FindChannelsForDevice(c *gin.Context, in *gb28181.FindDeviceInput) (any, error) {
 	items, total, err := a.gb28181Core.FindChannelsForDevice(c.Request.Context(), in)
+
+	// 按照在线优先排序
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].IsOnline && !items[j].IsOnline
+	})
+
 	return gin.H{"items": items, "total": total}, err
 }
 
