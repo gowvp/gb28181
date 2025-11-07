@@ -48,7 +48,7 @@ func DefaultConfig() Bootstrap {
 		Log: Log{
 			Dir:          "./logs",
 			Level:        "error",
-			MaxAge:       Duration(7 * 24 * time.Hour),
+			MaxAge:       Duration(3 * 24 * time.Hour),
 			RotationTime: Duration(8 * time.Hour),
 			RotationSize: 50,
 		},

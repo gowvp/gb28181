@@ -45,6 +45,17 @@ func (c *Core) GetStreamProxy(ctx context.Context, id string) (*StreamProxy, err
 	return &out, nil
 }
 
+func (c *Core) GetStreamProxyByAppStream(ctx context.Context, app, stream string) (*StreamProxy, error) {
+	var out StreamProxy
+	if err := c.store.StreamProxy().Get(ctx, &out, orm.Where("app=? AND stream=?", app, stream)); err != nil {
+		if orm.IsErrRecordNotFound(err) {
+			return nil, reason.ErrNotFound.Withf(`Get err[%s]`, err.Error())
+		}
+		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
+	}
+	return &out, nil
+}
+
 // AddStreamProxy Insert into database
 func (c *Core) AddStreamProxy(ctx context.Context, in *AddStreamProxyInput) (*StreamProxy, error) {
 	var out StreamProxy
@@ -55,6 +66,8 @@ func (c *Core) AddStreamProxy(ctx context.Context, in *AddStreamProxyInput) (*St
 		return nil, reason.ErrBadRequest.With("请更换 app 参数")
 	}
 	out.ID = c.uniqueID.UniqueID(bz.IDPrefixRTSP)
+	out.Stream = out.ID
+	out.App = "pull"
 	if err := c.store.StreamProxy().Add(ctx, &out); err != nil {
 		if orm.IsDuplicatedKey(err) {
 			return nil, reason.ErrDB.SetMsg("stream 重复，请勿重复添加")

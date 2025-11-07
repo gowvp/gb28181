@@ -200,7 +200,14 @@ func (n *NodeManager) connection(server *MediaServer, serverPort int) error {
 		HookEnable:           zlm.NewString("1"),
 		HookOnFlowReport:     zlm.NewString(""),
 		HookOnPlay:           zlm.NewString(fmt.Sprintf("%s/on_play", hookPrefix)),
+
 		// HookOnHTTPAccess:     zlm.NewString(""),
+		// 仅开启 hls_fmp4
+		ProtocolEnableTs:      zlm.NewString("0"),
+		ProtocolEnableFmp4:    zlm.NewString("0"),
+		ProtocolEnableHls:     zlm.NewString("0"),
+		ProtocolEnableHlsFmp4: zlm.NewString("1"),
+
 		HookOnPublish:                  zlm.NewString(fmt.Sprintf("%s/on_publish", hookPrefix)),
 		HookOnStreamNoneReader:         zlm.NewString(fmt.Sprintf("%s/on_stream_none_reader", hookPrefix)),
 		GeneralStreamNoneReaderDelayMS: zlm.NewString("30000"),

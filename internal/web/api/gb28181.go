@@ -167,8 +167,7 @@ func (a GB28181API) editChannel(c *gin.Context, in *gb28181.EditChannelInput) (a
 func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 	channelID := c.Param("id")
 
-	var app, appStream, host, stream, session string
-	var svr *sms.MediaServer
+	var app, appStream, host, stream, session, mediaServerID string
 
 	// 国标逻辑
 	if strings.HasPrefix(channelID, bz.IDPrefixGBChannel) {
@@ -185,10 +184,7 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 		app = "rtp"
 		appStream = ch.ID
 
-		svr, err = a.uc.SMSAPI.smsCore.GetMediaServer(c.Request.Context(), sms.DefaultMediaServerID)
-		if err != nil {
-			return nil, err
-		}
+		mediaServerID = sms.DefaultMediaServerID
 
 	} else if strings.HasPrefix(channelID, bz.IDPrefixRTMP) {
 		pu, err := a.uc.MediaAPI.pushCore.GetStreamPush(c.Request.Context(), channelID)
@@ -200,11 +196,7 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 		}
 		app = pu.App
 		appStream = pu.Stream
-
-		svr, err = a.uc.SMSAPI.smsCore.GetMediaServer(c.Request.Context(), pu.MediaServerID)
-		if err != nil {
-			return nil, err
-		}
+		mediaServerID = pu.MediaServerID
 
 		if !pu.IsAuthDisabled && pu.Session != "" {
 			session = "session=" + pu.Session
@@ -216,33 +208,16 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 		}
 		app = proxy.App
 		appStream = proxy.Stream
-
-		svr, err = a.uc.SMSAPI.smsCore.GetMediaServer(c.Request.Context(), sms.DefaultMediaServerID)
-		if err != nil {
-			return nil, err
-		}
-		resp, err := a.uc.SMSAPI.smsCore.AddStreamProxy(svr, zlm.AddStreamProxyRequest{
-			Vhost:      "__defaultVhost__",
-			App:        proxy.App,
-			Stream:     proxy.Stream,
-			URL:        proxy.SourceURL,
-			RetryCount: 3,
-			RTPType:    proxy.Transport,
-			TimeoutSec: 10,
-			// EnableRTMP:   zlm.NewBool(true),
-			// EnableRTSP:   zlm.NewBool(true),
-			// EnableHLS:    zlm.NewBool(true),
-			// EnableAudio:  zlm.NewBool(true),
-			AddMuteAudio: zlm.NewBool(true),
-			// AutoClose:    zlm.NewBool(false),
-		})
-		if err != nil {
-			return nil, reason.ErrServer.SetMsg(err.Error())
-		}
-		a.uc.ProxyAPI.proxyCore.EditStreamProxyKey(c.Request.Context(), resp.Data.Key, proxy.ID)
+		mediaServerID = sms.DefaultMediaServerID
 	} else {
 		return nil, reason.ErrNotFound.SetMsg("不支持的播放通道")
 	}
+
+	svr, err := a.uc.SMSAPI.smsCore.GetMediaServer(c.Request.Context(), mediaServerID)
+	if err != nil {
+		return nil, err
+	}
+
 	stream = app + "/" + appStream
 
 	host = c.Request.Host
@@ -267,15 +242,15 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 				WebRTC:  fmt.Sprintf("webrtc://%s:%d/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", host, httpPort, app, stream) + "&" + session,
 				HLS:     fmt.Sprintf("http://%s:%d/proxy/sms/%s/hls.fmp4.m3u8", host, httpPort, stream) + "?" + session,
 			},
-			{
-				Label:   "SSL 线路",
-				WSFLV:   fmt.Sprintf("wss://%s:%d/%s.live.flv", host, svr.Ports.HTTP, stream) + session,
-				HTTPFLV: fmt.Sprintf("https://%s:%d/%s.live.flv", host, svr.Ports.HTTP, stream) + session,
-				RTMP:    fmt.Sprintf("rtmps://%s:%d/%s", host, svr.Ports.RTMPs, stream) + session,
-				RTSP:    fmt.Sprintf("rtsps://%s:%d/%s", host, svr.Ports.RTSPs, stream) + session,
-				WebRTC:  fmt.Sprintf("webrtc://%s:%d/index/api/webrtc?app=%s&stream=%s&type=play", host, svr.Ports.HTTPS, app, stream) + "&" + session,
-				HLS:     fmt.Sprintf("https://%s:%d/%s/hls.fmp4.m3u8", host, svr.Ports.HTTPS, stream) + "?" + session,
-			},
+			// {
+			// 	Label:   "SSL 线路",
+			// 	WSFLV:   fmt.Sprintf("wss://%s:%d/%s.live.flv", host, svr.Ports.HTTP, stream) + session,
+			// 	HTTPFLV: fmt.Sprintf("https://%s:%d/%s.live.flv", host, svr.Ports.HTTP, stream) + session,
+			// 	RTMP:    fmt.Sprintf("rtmps://%s:%d/%s", host, svr.Ports.RTMPs, stream) + session,
+			// 	RTSP:    fmt.Sprintf("rtsps://%s:%d/%s", host, svr.Ports.RTSPs, stream) + session,
+			// 	WebRTC:  fmt.Sprintf("webrtc://%s:%d/index/api/webrtc?app=%s&stream=%s&type=play", host, svr.Ports.HTTPS, app, stream) + "&" + session,
+			// 	HLS:     fmt.Sprintf("https://%s:%d/%s/hls.fmp4.m3u8", host, svr.Ports.HTTPS, stream) + "?" + session,
+			// },
 		},
 	}
 
@@ -284,14 +259,15 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 		wsPrefix := strings.Replace(strings.Replace(prefix, "https", "wss", 1), "http", "ws", 1)
 		out.Items[0].WSFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", wsPrefix, stream) + "?" + session
 		out.Items[0].HTTPFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", prefix, stream) + "?" + session
-
-		host := c.Request.Header.Get("X-Forwarded-Host")
-		out.Items[0].RTMP = fmt.Sprintf("rtmp://%s:%d/proxy/sms/%s.live.flv", host, svr.Ports.RTMP, stream) + "?" + session
-		out.Items[0].RTSP = fmt.Sprintf("rtsp://%s:%d/proxy/sms/%s.live.flv", host, svr.Ports.RTSP, stream) + "?" + session
 		out.Items[0].HLS = fmt.Sprintf("%s/proxy/sms/%s/hls.fmp4.m3u8", prefix, stream) + "?" + session
 		rtcPrefix := strings.Replace(strings.Replace(prefix, "https", "webrtc", 1), "http", "webrtc", 1)
 		out.Items[0].WebRTC = fmt.Sprintf("%s/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", rtcPrefix, app, stream) + "&" + session
 
+		host := c.Request.Header.Get("X-Forwarded-Host")
+		if host != "" {
+			out.Items[0].RTMP = fmt.Sprintf("rtmp://%s:%d/%s", host, svr.Ports.RTMP, stream) + "?" + session
+			out.Items[0].RTSP = fmt.Sprintf("rtsp://%s:%d/%s", host, svr.Ports.RTSP, stream) + "?" + session
+		}
 	}
 
 	// 取一张快照
