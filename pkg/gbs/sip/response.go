@@ -34,9 +34,16 @@ func NewResponseFromRequest(
 	CopyHeaders("Record-Route", req, res)
 	CopyHeaders("Via", req, res)
 	CopyHeaders("From", req, res)
-	CopyHeaders("To", req, res)
-	CopyHeaders("Call-ID", req, res)
+	to, ok := req.To()
+	if ok {
+		if _, ok := to.Params.Get("tag"); !ok {
+			to.Params.Add("tag", String{Str: RandString(32)})
+		}
+	}
 	CopyHeaders("CSeq", req, res)
+	CopyHeaders("Call-ID", req, res)
+
+	res.AppendHeader(to)
 
 	if statusCode == 100 {
 		CopyHeaders("Timestamp", req, res)
@@ -45,9 +52,12 @@ func NewResponseFromRequest(
 	res.SetSource(req.Destination())
 	res.SetDestination(req.Source())
 
-	if len(body) > 0 {
-		res.SetBody(body, true)
-	}
+	res.SetBody(body, true)
+
+	res.AppendHeader(&GenericHeader{
+		HeaderName: "User-Agent",
+		Contents:   "GoWVP/1.0",
+	})
 
 	return res
 }

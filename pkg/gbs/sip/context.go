@@ -30,7 +30,8 @@ type Context struct {
 
 	Log *slog.Logger
 
-	svr *Server
+	svr    *Server
+	XGBVer string
 }
 
 func newContext(req *Request, tx *Transaction) *Context {
@@ -74,6 +75,23 @@ func (c *Context) parserRequest() error {
 	c.To = NewAddressFromFromHeader(header)
 	if c.To == nil {
 		slog.Error(">>>>>>>> to is nil", "header", header)
+	}
+
+	xgbVer := req.GetHeaders("X-GB-Ver")
+	if len(xgbVer) > 0 {
+		h := xgbVer[0]
+		parts := strings.Split(h.String(), ":")
+		if len(parts) == 2 {
+			switch strings.TrimSpace(parts[1]) {
+			case "3.0":
+				c.XGBVer = "2022"
+			case "2.0":
+				c.XGBVer = "2016"
+			case "1.0":
+				c.XGBVer = "2011"
+			}
+		}
+
 	}
 
 	c.Log = slog.Default().With("deviceID", c.DeviceID, "host", c.Host)

@@ -26,6 +26,7 @@ type HeadersBuilder struct {
 	maxForwards *MaxForwards
 	allow       *AllowHeader
 	supported   *SupportedHeader
+	XGBVer      *XGBVer
 	// recipient *URI
 }
 
@@ -34,6 +35,7 @@ func NewHeaderBuilder() *HeadersBuilder {
 	callID := CallID(RandString(32))
 	maxForwards := MaxForwards(70)
 	userAgent := UserAgentHeader("GoWVP")
+	xgbVer := XGBVer("3.0")
 	return &HeadersBuilder{
 		protocol:        "SIP",
 		protocolVersion: "2.0",
@@ -47,6 +49,7 @@ func NewHeaderBuilder() *HeadersBuilder {
 		generic:         make(map[string]Header),
 		allow:           defaultAllowMethods,
 		supported:       &SupportedHeader{Options: []string{}},
+		XGBVer:          &xgbVer,
 	}
 }
 
@@ -89,11 +92,20 @@ func (hb *HeadersBuilder) Build() []Header {
 	if hb.contentType != nil {
 		hdrs = append(hdrs, hb.contentType)
 	}
+	if hb.XGBVer != nil {
+		hdrs = append(hdrs, hb.XGBVer)
+	}
 
 	// for _, header := range hb.generic {
 	// 	hdrs = append(hdrs, header)
 	// }
 	return hdrs
+}
+
+func (hb *HeadersBuilder) SetXGBVer() *HeadersBuilder {
+	s := XGBVer("3.0")
+	hb.XGBVer = &s
+	return hb
 }
 
 // SetMethod SetMethod
@@ -1666,4 +1678,23 @@ func (header *GenericHeader) Equals(other interface{}) bool {
 	}
 
 	return false
+}
+
+type XGBVer string
+
+func (ct XGBVer) String() string { return "X-GB-Ver: " + string(ct) }
+
+// Name Name
+func (ct XGBVer) Name() string { return "X-GB-Ver" }
+
+// Clone Clone
+func (ct XGBVer) Clone() Header { return &ct }
+
+// Equals Equals
+func (ct *XGBVer) Equals(other interface{}) bool {
+	h, ok := other.(XGBVer)
+	if !ok {
+		return false
+	}
+	return h.String() == ct.String()
 }

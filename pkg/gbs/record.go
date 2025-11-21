@@ -139,7 +139,6 @@ type RecordDate struct {
 	Items []RecordInfo `json:"items"`
 }
 
-// RecordInfo RecordInfo
 type RecordInfo struct {
 	Start int64 `json:"start" bson:"start"`
 	End   int64 `json:"end" bson:"end"`

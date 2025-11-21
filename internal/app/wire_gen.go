@@ -7,14 +7,13 @@
 package app
 
 import (
-	"log/slog"
-	"net/http"
-
 	"github.com/gowvp/gb28181/internal/conf"
 	"github.com/gowvp/gb28181/internal/data"
 	"github.com/gowvp/gb28181/internal/web/api"
 	"github.com/gowvp/gb28181/pkg/gbs"
 	"github.com/ixugo/goddd/domain/version/versionapi"
+	"log/slog"
+	"net/http"
 )
 
 // Injectors from wire.go:
@@ -30,13 +29,14 @@ func wireApp(bc *conf.Bootstrap, log *slog.Logger) (http.Handler, func(), error)
 	smsAPI := api.NewSmsAPI(smsCore)
 	uniqueidCore := api.NewUniqueID(db)
 	pushCore := api.NewPushCore(db, uniqueidCore)
-	storer := api.NewGB28181Store(db)
-	gb28181 := api.NewGB28181(storer, uniqueidCore)
-	server, cleanup := gbs.NewServer(bc, gb28181, smsCore)
-	gb28181Core := api.NewGB28181Core(storer, uniqueidCore)
-	webHookAPI := api.NewWebHookAPI(smsCore, pushCore, bc, server, gb28181Core)
+	storer := api.NewIPCStore(db)
+	gbdAdapter := api.NewGBAdapter(storer, uniqueidCore)
+	server, cleanup := gbs.NewServer(bc, gbdAdapter, smsCore)
+	v := api.NewProtocols(storer)
+	ipcCore := api.NewIPCCore(storer, uniqueidCore, v)
+	webHookAPI := api.NewWebHookAPI(smsCore, pushCore, bc, server, ipcCore)
 	pushAPI := api.NewPushAPI(pushCore, smsCore, bc)
-	gb28181API := api.NewGB28181API(gb28181Core)
+	ipcapi := api.NewIPCAPI(ipcCore)
 	proxyAPI := api.NewProxyAPI(db, uniqueidCore)
 	configAPI := api.NewConfigAPI(db, bc)
 	userAPI := api.NewUserAPI(bc)
@@ -48,7 +48,7 @@ func wireApp(bc *conf.Bootstrap, log *slog.Logger) (http.Handler, func(), error)
 		WebHookAPI: webHookAPI,
 		UniqueID:   uniqueidCore,
 		MediaAPI:   pushAPI,
-		GB28181API: gb28181API,
+		GB28181API: ipcapi,
 		ProxyAPI:   proxyAPI,
 		ConfigAPI:  configAPI,
 		SipServer:  server,

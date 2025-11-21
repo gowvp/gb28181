@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gowvp/gb28181/internal/conf"
 	"github.com/gowvp/gb28181/internal/core/bz"
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/internal/core/push"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/gbs"
@@ -204,12 +204,12 @@ type RTPStream struct {
 }
 
 func (r RTPStream) onStreamNotFound(ctx context.Context, in *onStreamNotFoundInput) error {
-	ch, err := r.uc.GB28181API.gb28181Core.GetChannel(ctx, in.Stream)
+	ch, err := r.uc.GB28181API.ipc.GetChannel(ctx, in.Stream)
 	if err != nil {
 		return err
 	}
 
-	dev, err := r.uc.GB28181API.gb28181Core.GetDevice(ctx, ch.DID)
+	dev, err := r.uc.GB28181API.ipc.GetDevice(ctx, ch.DID)
 	if err != nil {
 		return err
 	}

@@ -1,4 +1,4 @@
-package gb28181
+package ipc
 
 import (
 	"context"
@@ -9,25 +9,25 @@ import (
 	"github.com/ixugo/goddd/pkg/web"
 )
 
-type GB28181 struct {
+type GBDAdapter struct {
 	// deviceStore  DeviceStorer
 	// channelStore ChannelStorer
 	store Storer
 	uni   uniqueid.Core
 }
 
-func NewGB28181(store Storer, uni uniqueid.Core) GB28181 {
-	return GB28181{
+func NewGBAdapter(store Storer, uni uniqueid.Core) GBDAdapter {
+	return GBDAdapter{
 		store: store,
 		uni:   uni,
 	}
 }
 
-func (g GB28181) Store() Storer {
+func (g GBDAdapter) Store() Storer {
 	return g.store
 }
 
-func (g GB28181) GetDeviceByDeviceID(deviceID string) (*Device, error) {
+func (g GBDAdapter) GetDeviceByDeviceID(deviceID string) (*Device, error) {
 	ctx := context.TODO()
 	var d Device
 	if err := g.store.Device().Get(ctx, &d, orm.Where("device_id=?", deviceID)); err != nil {
@@ -42,7 +42,7 @@ func (g GB28181) GetDeviceByDeviceID(deviceID string) (*Device, error) {
 	return &d, nil
 }
 
-func (g GB28181) Logout(deviceID string, changeFn func(*Device)) error {
+func (g GBDAdapter) Logout(deviceID string, changeFn func(*Device)) error {
 	var d Device
 	if err := g.store.Device().Edit(context.TODO(), &d, func(d *Device) {
 		changeFn(d)
@@ -53,7 +53,7 @@ func (g GB28181) Logout(deviceID string, changeFn func(*Device)) error {
 	return nil
 }
 
-func (g GB28181) Edit(deviceID string, changeFn func(*Device)) error {
+func (g GBDAdapter) Edit(deviceID string, changeFn func(*Device)) error {
 	var d Device
 	if err := g.store.Device().Edit(context.TODO(), &d, func(d *Device) {
 		changeFn(d)
@@ -64,7 +64,7 @@ func (g GB28181) Edit(deviceID string, changeFn func(*Device)) error {
 	return nil
 }
 
-func (g GB28181) EditPlaying(deviceID, channelID string, playing bool) error {
+func (g GBDAdapter) EditPlaying(deviceID, channelID string, playing bool) error {
 	var ch Channel
 	if err := g.store.Channel().Edit(context.TODO(), &ch, func(c *Channel) {
 		c.IsPlaying = playing
@@ -74,7 +74,7 @@ func (g GB28181) EditPlaying(deviceID, channelID string, playing bool) error {
 	return nil
 }
 
-func (g GB28181) SaveChannels(channels []*Channel) error {
+func (g GBDAdapter) SaveChannels(channels []*Channel) error {
 	if len(channels) <= 0 {
 		return nil
 	}
@@ -106,7 +106,7 @@ func (g GB28181) SaveChannels(channels []*Channel) error {
 }
 
 // FindDevices 获取所有设备
-func (g GB28181) FindDevices(ctx context.Context) ([]*Device, error) {
+func (g GBDAdapter) FindDevices(ctx context.Context) ([]*Device, error) {
 	var devices []*Device
 	if _, err := g.store.Device().Find(ctx, &devices, web.NewPagerFilterMaxSize()); err != nil {
 		return nil, err

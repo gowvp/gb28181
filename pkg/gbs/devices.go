@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/pkg/gbs/m"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/conc"
@@ -43,7 +43,7 @@ type Device struct {
 	keepaliveTimeout  uint16
 }
 
-func NewDevice(conn sip.Connection, d *gb28181.Device) *Device {
+func NewDevice(conn sip.Connection, d *ipc.Device) *Device {
 	uri, err := sip.ParseURI(fmt.Sprintf("sip:%s@%s", d.DeviceID, d.Address))
 	if err != nil {
 		slog.Error("parse uri", "err", err, "did", d.ID)
@@ -89,7 +89,7 @@ func (d *Device) CheckConnection() error {
 	return nil
 }
 
-func (d *Device) LoadChannels(channels ...*gb28181.Channel) {
+func (d *Device) LoadChannels(channels ...*ipc.Channel) {
 	for _, channel := range channels {
 		ch := Channel{
 			ChannelID: channel.ChannelID,

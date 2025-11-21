@@ -1,7 +1,7 @@
 package gbs
 
 import (
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/orm"
 	// "github.com/panjjo/gosip/db"
@@ -31,11 +31,11 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 		to:     ctx.To,
 	})
 
-	if err := g.svr.memoryStorer.Change(ctx.DeviceID, func(d *gb28181.Device) {
+	if err := g.svr.memoryStorer.Change(ctx.DeviceID, func(d *ipc.Device) {
 		d.KeepaliveAt = orm.Now()
 		d.IsOnline = msg.Status == "OK" || msg.Status == "ON"
 		d.Address = ctx.Source.String()
-		d.Trasnport = ctx.Source.Network()
+		d.Transport = ctx.Source.Network()
 	}, func(d *Device) {
 		d.conn = ctx.Request.GetConnection()
 		d.source = ctx.Source

@@ -16,7 +16,7 @@ type ProxyAPI struct {
 }
 
 func NewProxyAPI(db *gorm.DB, uni uniqueid.Core) ProxyAPI {
-	core := proxy.NewCore(proxydb.NewDB(db).AutoMigrate(orm.EnabledAutoMigrate), uni)
+	core := proxy.NewCore(proxydb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()), uni)
 	return ProxyAPI{proxyCore: core}
 }
 

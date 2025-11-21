@@ -33,6 +33,7 @@ func NewRequest(
 	req.SetSipVersion(sipVersion)
 	req.startLine = req.StartLine
 	req.headers = newHeaders(hdrs)
+
 	req.SetMethod(method)
 	req.SetRecipient(recipient)
 
@@ -43,26 +44,26 @@ func NewRequest(
 }
 
 // NewRequestFromResponse NewRequestFromResponse
-func NewRequestFromResponse(method string, inviteResponse *Response) *Request {
-	contact, _ := inviteResponse.Contact()
+func NewRequestFromResponse(method string, resp *Response) *Request {
+	contact, _ := resp.Contact()
 	ackRequest := NewRequest(
-		inviteResponse.MessageID(),
+		resp.MessageID(),
 		method,
 		contact.Address,
-		inviteResponse.SipVersion(),
+		resp.SipVersion(),
 		[]Header{},
 		[]byte{},
 	)
 
-	CopyHeaders("Via", inviteResponse, ackRequest)
+	CopyHeaders("Via", resp, ackRequest)
 	viaHop, _ := ackRequest.ViaHop()
 	// update branch, 2xx ACK is separate Tx
 	viaHop.Params.Add("branch", String{Str: GenerateBranch()})
 
-	if len(inviteResponse.GetHeaders("Route")) > 0 {
-		CopyHeaders("Route", inviteResponse, ackRequest)
+	if len(resp.GetHeaders("Route")) > 0 {
+		CopyHeaders("Route", resp, ackRequest)
 	} else {
-		for _, h := range inviteResponse.GetHeaders("Record-Route") {
+		for _, h := range resp.GetHeaders("Record-Route") {
 			uris := make([]*URI, 0)
 			for _, u := range h.(*RecordRouteHeader).Addresses {
 				uris = append(uris, u.Clone())
@@ -73,10 +74,10 @@ func NewRequestFromResponse(method string, inviteResponse *Response) *Request {
 		}
 	}
 
-	CopyHeaders("From", inviteResponse, ackRequest)
-	CopyHeaders("To", inviteResponse, ackRequest)
-	CopyHeaders("Call-ID", inviteResponse, ackRequest)
-	cseq, _ := inviteResponse.CSeq()
+	CopyHeaders("From", resp, ackRequest)
+	CopyHeaders("To", resp, ackRequest)
+	CopyHeaders("Call-ID", resp, ackRequest)
+	cseq, _ := resp.CSeq()
 	cseq.MethodName = method
 
 	// https://www.rfc-editor.org/rfc/rfc3261.html#section-12.2.1.1
@@ -92,8 +93,8 @@ func NewRequestFromResponse(method string, inviteResponse *Response) *Request {
 		cseq.SeqNo++
 	}
 	ackRequest.AppendHeader(cseq)
-	ackRequest.SetSource(inviteResponse.Destination())
-	ackRequest.SetDestination(inviteResponse.Source())
+	ackRequest.SetSource(resp.Destination())
+	ackRequest.SetDestination(resp.Source())
 	return ackRequest
 }
 

@@ -9,7 +9,7 @@ import (
 	"unicode"
 
 	"github.com/gowvp/gb28181/internal/conf"
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/conc"
@@ -20,7 +20,7 @@ const ignorePassword = "#"
 
 type GB28181API struct {
 	cfg  *conf.SIP
-	core gb28181.GB28181
+	core gb28181.GBDAdapter
 
 	catalog *sip.Collector[Channels]
 
@@ -32,7 +32,7 @@ type GB28181API struct {
 	sms *sms.NodeManager
 }
 
-func NewGB28181API(cfg *conf.Bootstrap, store gb28181.GB28181, sms *sms.NodeManager) *GB28181API {
+func NewGB28181API(cfg *conf.Bootstrap, store gb28181.GBDAdapter, sms *sms.NodeManager) *GB28181API {
 	g := GB28181API{
 		cfg:  &cfg.Sip,
 		core: store,
@@ -130,14 +130,16 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	if dev.Password == ignorePassword {
 		password = ""
 	}
+
+	hdrs := ctx.Request.GetHeaders("Authorization")
+	if len(hdrs) == 0 {
+		resp := sip.NewResponseFromRequest("", ctx.Request, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized), nil)
+		resp.AppendHeader(&sip.GenericHeader{HeaderName: "WWW-Authenticate", Contents: fmt.Sprintf(`Digest realm="%s",qop="auth",nonce="%s"`, g.cfg.Domain, sip.RandString(32))})
+		_ = ctx.Tx.Respond(resp)
+		return
+	}
+
 	if password != "" {
-		hdrs := ctx.Request.GetHeaders("Authorization")
-		if len(hdrs) == 0 {
-			resp := sip.NewResponseFromRequest("", ctx.Request, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized), nil)
-			resp.AppendHeader(&sip.GenericHeader{HeaderName: "WWW-Authenticate", Contents: fmt.Sprintf("Digest nonce=\"%s\", algorithm=MD5, realm=\"%s\",qop=\"auth\"", sip.RandString(32), g.cfg.Domain)})
-			_ = ctx.Tx.Respond(resp)
-			return
-		}
 		authenticateHeader := hdrs[0].(*sip.GenericHeader)
 		auth := sip.AuthFromValue(authenticateHeader.Contents)
 		auth.SetPassword(password)
@@ -170,10 +172,19 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		respFn()
 		return
 	}
-	g.login(ctx, expire)
+
+	g.login(ctx, func(b *gb28181.Device) {
+		b.IsOnline = true
+		b.RegisteredAt = orm.Now()
+		b.KeepaliveAt = orm.Now()
+		b.Expires, _ = strconv.Atoi(expire)
+		b.Address = ctx.Source.String()
+		b.Transport = ctx.Source.Network()
+		b.Ext.GBVersion = ctx.XGBVer
+	})
 
 	// conn := ctx.Request.GetConnection()
-	// fmt.Printf(">>> %p\n", conn)
+	// fmt.Printf(">>> %p\n", conn
 
 	ctx.Log.Info("设备注册成功")
 	// ctx.Log.Debug("device info", "source", ctx.Source, "host", ctx.Host)
@@ -185,14 +196,9 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	_ = g.QueryConfigDownloadBasic(dev.DeviceID)
 }
 
-func (g GB28181API) login(ctx *sip.Context, expire string) {
+func (g GB28181API) login(ctx *sip.Context, fn func(d *gb28181.Device)) {
 	slog.Info("status change 设备上线", "device_id", ctx.DeviceID)
-	g.svr.memoryStorer.Change(ctx.DeviceID, func(d *gb28181.Device) {
-		d.IsOnline = true
-		d.RegisteredAt = orm.Now()
-		d.KeepaliveAt = orm.Now()
-		d.Expires, _ = strconv.Atoi(expire)
-	}, func(d *Device) {
+	g.svr.memoryStorer.Change(ctx.DeviceID, fn, func(d *Device) {
 		d.conn = ctx.Request.GetConnection()
 		d.source = ctx.Source
 		d.to = ctx.To

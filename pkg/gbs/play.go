@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/gbs/m"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
@@ -16,13 +16,13 @@ import (
 )
 
 type PlayInput struct {
-	Channel    *gb28181.Channel
+	Channel    *ipc.Channel
 	SMS        *sms.MediaServer
 	StreamMode int8
 }
 
 type StopPlayInput struct {
-	Channel *gb28181.Channel
+	Channel *ipc.Channel
 }
 
 // stopPlay 不加锁的
@@ -158,7 +158,7 @@ func GetIP(input string) (string, error) {
 		return ips[0].String(), nil
 	}
 
-		slog.Error("域名没有解析到任何IP地址", "域名", input)
+	slog.Error("域名没有解析到任何IP地址", "域名", input)
 	return input, fmt.Errorf("域名没有解析到IP地址")
 }
 
@@ -196,11 +196,10 @@ func (g *GB28181API) sipPlayPush2(ch *Channel, in *PlayInput, port int, stream *
 	video.AddAttribute("rtpmap", "97", "MPEG4/90000")
 	video.AddAttribute("rtpmap", "98", "H264/90000")
 
-	//获取配置值
+	// 获取配置值
 	ipstr := in.SMS.GetSDPIP()
-	//进行IP解析
+	// 进行IP解析
 	ip4str, err := GetIP(ipstr)
-
 	if err != nil {
 		slog.Error("域名解析失败", "域名", ipstr, "错误", err)
 		return err

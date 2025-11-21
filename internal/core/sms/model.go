@@ -25,7 +25,7 @@ type MediaServerPorts struct {
 
 // Scan implements orm.Scaner.
 func (i *MediaServerPorts) Scan(input interface{}) error {
-	return orm.JsonUnmarshal(input, i)
+	return orm.JSONUnmarshal(input, i)
 }
 
 // Value implements driver.Valuer.

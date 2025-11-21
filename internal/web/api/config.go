@@ -21,7 +21,7 @@ type ConfigAPI struct {
 }
 
 func NewConfigAPI(db *gorm.DB, conf *conf.Bootstrap) ConfigAPI {
-	core := config.NewCore(configdb.NewDB(db).AutoMigrate(orm.EnabledAutoMigrate))
+	core := config.NewCore(configdb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()))
 	return ConfigAPI{configCore: core, conf: conf}
 }
 

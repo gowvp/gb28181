@@ -6,11 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	"github.com/gowvp/gb28181/internal/conf"
-	"github.com/gowvp/gb28181/internal/core/gb28181"
-	"github.com/gowvp/gb28181/internal/core/gb28181/store/gb28181cache"
-	"github.com/gowvp/gb28181/internal/core/gb28181/store/gb28181db"
+	"github.com/gowvp/gb28181/internal/core/ipc"
+	"github.com/gowvp/gb28181/internal/core/ipc/store/ipccache"
+	"github.com/gowvp/gb28181/internal/core/ipc/store/ipcdb"
+	"github.com/gowvp/gb28181/internal/core/port"
 	"github.com/gowvp/gb28181/internal/core/push"
 	"github.com/gowvp/gb28181/internal/core/push/store/pushdb"
+	onvifadapter "github.com/gowvp/gb28181/internal/protocol/onvif"
 	"github.com/gowvp/gb28181/pkg/gbs"
 	"github.com/ixugo/goddd/domain/uniqueid"
 	"github.com/ixugo/goddd/domain/uniqueid/store/uniqueiddb"
@@ -31,10 +33,7 @@ var (
 		NewUniqueID,
 		NewPushCore, NewPushAPI,
 		gbs.NewServer,
-		NewGB28181Store,
-		NewGB28181API,
-		NewGB28181Core,
-		NewGB28181,
+		NewIPCStore, NewProtocols, NewIPCCore, NewIPCAPI, NewGBAdapter,
 		NewProxyAPI,
 		NewConfigAPI,
 		NewUserAPI,
@@ -49,7 +48,7 @@ type Usecase struct {
 	WebHookAPI WebHookAPI
 	UniqueID   uniqueid.Core
 	MediaAPI   PushAPI
-	GB28181API GB28181API
+	GB28181API IPCAPI
 	ProxyAPI   ProxyAPI
 	ConfigAPI  ConfigAPI
 
@@ -79,7 +78,7 @@ func NewHTTPHandler(uc *Usecase) http.Handler {
 	}
 
 	setupRouter(g, uc) // 设置路由处理函数
-
+	uc.Version.RecordVersion()
 	return g // 返回配置好的 Gin 实例作为 http.Handler
 }
 
@@ -92,13 +91,26 @@ func NewPushCore(db *gorm.DB, uni uniqueid.Core) push.Core {
 	return push.NewCore(pushdb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()), uni)
 }
 
-func NewGB28181Store(db *gorm.DB) gb28181.Storer {
-	return gb28181cache.NewCache(gb28181db.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()))
+func NewIPCStore(db *gorm.DB) ipc.Storer {
+	return ipccache.NewCache(ipcdb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()))
 }
 
-func NewGB28181(store gb28181.Storer, uni uniqueid.Core) gb28181.GB28181 {
-	return gb28181.NewGB28181(
+func NewGBAdapter(store ipc.Storer, uni uniqueid.Core) ipc.GBDAdapter {
+	return ipc.NewGBAdapter(
 		store,
 		uni,
 	)
+}
+
+// NewProtocols 创建协议适配器映射
+func NewProtocols(store ipc.Storer) map[string]port.Protocol {
+	protocols := make(map[string]port.Protocol)
+
+	// 注册 ONVIF 协议适配器
+	protocols["ONVIF"] = onvifadapter.NewAdapter(store)
+
+	// TODO: 注册 GB28181 协议适配器
+	// protocols["GB28181"] = gb28181adapter.NewAdapter(sipServer, store)
+
+	return protocols
 }

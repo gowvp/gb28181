@@ -1,4 +1,4 @@
-package gb28181cache
+package ipccache
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/pkg/gbs"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/conc"
@@ -54,7 +54,7 @@ func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
 	}
 
 	for _, d := range devices {
-		if strings.ToLower(d.Trasnport) == "tcp" {
+		if strings.ToLower(d.Transport) == "tcp" {
 			// 通知相关设备/通道离线
 			c.Change(d.DeviceID, func(d *gb28181.Device) {
 				d.IsOnline = false

@@ -1,4 +1,4 @@
-package gb28181db
+package ipcdb
 
 import (
 	"github.com/DATA-DOG/go-sqlmock"

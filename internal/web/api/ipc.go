@@ -2,6 +2,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,11 +13,14 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gowvp/gb28181/internal/core/bz"
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	"github.com/gowvp/gb28181/internal/core/ipc"
+	"github.com/gowvp/gb28181/internal/core/port"
 	"github.com/gowvp/gb28181/internal/core/push"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/zlm"
+	"github.com/gowvp/onvif"
 	"github.com/ixugo/goddd/domain/uniqueid"
 	"github.com/ixugo/goddd/pkg/hook"
 	"github.com/ixugo/goddd/pkg/orm"
@@ -33,7 +37,9 @@ const (
 // TODO: 快照不会删除，只会覆盖，设备删除时也不会删除快照，待实现
 func writeCover(dataDir, channelID string, body []byte) error {
 	coverPath := filepath.Join(dataDir, coverDir)
-	os.MkdirAll(coverPath, 0o755)
+	if err := os.MkdirAll(coverPath, 0o777); err != nil {
+		return err
+	}
 	return os.WriteFile(filepath.Join(coverPath, channelID+".jpg"), body, 0o644)
 }
 
@@ -46,80 +52,100 @@ func readCover(dataDir, channelID string) ([]byte, error) {
 	return os.ReadFile(readCoverPath(dataDir, channelID))
 }
 
-type GB28181API struct {
-	gb28181Core gb28181.Core
-	uc          *Usecase
+type IPCAPI struct {
+	ipc ipc.Core
+	uc  *Usecase
 }
 
-func NewGB28181API(core gb28181.Core) GB28181API {
-	return GB28181API{gb28181Core: core}
+func NewIPCAPI(core ipc.Core) IPCAPI {
+	return IPCAPI{ipc: core}
 }
 
-func NewGB28181Core(store gb28181.Storer, uni uniqueid.Core) gb28181.Core {
-	return gb28181.NewCore(store, uni)
+func NewIPCCore(store ipc.Storer, uni uniqueid.Core, protocols map[string]port.Protocol) ipc.Core {
+	return ipc.NewCore(store, uni, protocols)
 }
 
-func registerGB28181(g gin.IRouter, api GB28181API, handler ...gin.HandlerFunc) {
+func registerGB28181(g gin.IRouter, api IPCAPI, handler ...gin.HandlerFunc) {
+	// GB28181 协议特有的回调接口
 	g.Any("/gb28181/snapshot", func(c *gin.Context) {
 		b, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			panic(err)
 		}
-		os.WriteFile(orm.GenerateRandomString(10)+".jpg", b, 0o644)
+		if err := os.WriteFile(orm.GenerateRandomString(10)+".jpg", b, 0o644); err != nil {
+			slog.ErrorContext(c.Request.Context(), "write cover", "err", err)
+		}
 		c.JSON(200, gin.H{"msg": "ok"})
 	})
+
+	// 统一的设备管理 API（支持所有协议）
 	{
 		group := g.Group("/devices", handler...)
-		group.GET("", web.WrapH(api.findDevice))                     // 设备列表
-		group.GET("/:id", web.WrapH(api.getDevice))                  // 设备详情
-		group.PUT("/:id", web.WrapH(api.editDevice))                 // 修改设备详情
-		group.POST("", web.WrapH(api.addDevice))                     // 添加设备
-		group.DELETE("/:id", web.WrapH(api.delDevice))               // 删除设备
-		group.POST("/:id/catalog", web.WrapH(api.queryCatalog))      // 刷新通道
-		group.GET("/channels", web.WrapH(api.FindChannelsForDevice)) // 设备与通道列表
+		group.GET("", web.WrapH(api.findDevice))                     // 设备列表（所有协议）
+		group.GET("/:id", web.WrapH(api.getDevice))                  // 设备详情（所有协议）
+		group.PUT("/:id", web.WrapH(api.editDevice))                 // 修改设备（所有协议）
+		group.POST("", web.WrapH(api.addDevice))                     // 添加设备（所有协议，通过 type 区分）
+		group.DELETE("/:id", web.WrapH(api.delDevice))               // 删除设备（所有协议）
+		group.GET("/channels", web.WrapH(api.FindChannelsForDevice)) // 设备与通道列表（所有协议）
+
+		// GB28181 特有功能
+		group.POST("/:id/catalog", web.WrapH(api.queryCatalog)) // 刷新通道（GB28181 特有）
+	}
+	{
+		group := g.Group("/onvif", handler...)
+		group.GET("/discover", api.discover) // ONVIF 设备发现（ONVIF 特有）
 	}
 
+	// 统一的通道管理 API（支持所有协议）
 	{
 		group := g.Group("/channels", handler...)
-		group.GET("", web.WrapH(api.findChannel))
-		group.PUT("/:id", web.WrapH(api.editChannel))
-		group.POST("/:id/play", web.WrapH(api.play))
-
-		group.POST("/:id/snapshot", web.WrapH(api.refreshSnapshot)) // 图像抓拍
-		group.GET("/:id/snapshot", api.getSnapshot)                 // 获取图像
-		// group.GET("/:id", web.WrapH(api.getChannel))
-		// group.POST("", web.WrapH(api.addChannel))
-		// group.DELETE("/:id", web.WrapH(api.delChannel))
+		group.GET("", web.WrapH(api.findChannel))                   // 通道列表（所有协议）
+		group.PUT("/:id", web.WrapH(api.editChannel))               // 修改通道（所有协议）
+		group.POST("/:id/play", web.WrapH(api.play))                // 播放（所有协议）
+		group.POST("/:id/snapshot", web.WrapH(api.refreshSnapshot)) // 图像抓拍（所有协议）
+		group.GET("/:id/snapshot", api.getSnapshot)                 // 获取图像（所有协议）
 	}
 }
 
 // >>> device >>>>>>>>>>>>>>>>>>>>
 
-func (a GB28181API) findDevice(c *gin.Context, in *gb28181.FindDeviceInput) (any, error) {
-	items, total, err := a.gb28181Core.FindDevice(c.Request.Context(), in)
+func (a IPCAPI) findDevice(c *gin.Context, in *ipc.FindDeviceInput) (any, error) {
+	items, total, err := a.ipc.FindDevice(c.Request.Context(), in)
 	return gin.H{"items": items, "total": total}, err
 }
 
-func (a GB28181API) getDevice(c *gin.Context, _ *struct{}) (any, error) {
+func (a IPCAPI) getDevice(c *gin.Context, _ *struct{}) (any, error) {
 	deviceID := c.Param("id")
-	return a.gb28181Core.GetDevice(c.Request.Context(), deviceID)
+	return a.ipc.GetDevice(c.Request.Context(), deviceID)
 }
 
-func (a GB28181API) editDevice(c *gin.Context, in *gb28181.EditDeviceInput) (any, error) {
+func (a IPCAPI) editDevice(c *gin.Context, in *ipc.EditDeviceInput) (any, error) {
 	deviceID := c.Param("id")
-	return a.gb28181Core.EditDevice(c.Request.Context(), in, deviceID)
+	return a.ipc.EditDevice(c.Request.Context(), in, deviceID)
 }
 
-func (a GB28181API) addDevice(c *gin.Context, in *gb28181.AddDeviceInput) (any, error) {
-	return a.gb28181Core.AddDevice(c.Request.Context(), in)
+// addDevice 添加设备（支持所有协议类型）
+// 通过 type 字段区分协议: "GB28181" 或 "ONVIF"
+//
+// 示例1 - 添加 GB28181 设备:
+//
+//	POST /devices
+//	{ "type": "GB28181", "device_id": "34020000001320000001", "name": "摄像头1" }
+//
+// 示例2 - 添加 ONVIF 设备:
+//
+//	POST /devices
+//	{ "type": "ONVIF", "ip": "192.168.1.100", "port": 80, "username": "admin", "password": "12345" }
+func (a IPCAPI) addDevice(c *gin.Context, in *ipc.AddDeviceInput) (any, error) {
+	return a.ipc.AddDevice(c.Request.Context(), in)
 }
 
-func (a GB28181API) delDevice(c *gin.Context, _ *struct{}) (any, error) {
+func (a IPCAPI) delDevice(c *gin.Context, _ *struct{}) (any, error) {
 	did := c.Param("id")
-	return a.gb28181Core.DelDevice(c.Request.Context(), did)
+	return a.ipc.DelDevice(c.Request.Context(), did)
 }
 
-func (a GB28181API) queryCatalog(c *gin.Context, _ *struct{}) (any, error) {
+func (a IPCAPI) queryCatalog(c *gin.Context, _ *struct{}) (any, error) {
 	did := c.Param("id")
 	if err := a.uc.SipServer.QueryCatalog(did); err != nil {
 		return nil, ErrDevice.SetMsg(err.Error())
@@ -127,8 +153,8 @@ func (a GB28181API) queryCatalog(c *gin.Context, _ *struct{}) (any, error) {
 	return gin.H{"msg": "ok"}, nil
 }
 
-func (a GB28181API) FindChannelsForDevice(c *gin.Context, in *gb28181.FindDeviceInput) (any, error) {
-	items, total, err := a.gb28181Core.FindChannelsForDevice(c.Request.Context(), in)
+func (a IPCAPI) FindChannelsForDevice(c *gin.Context, in *ipc.FindDeviceInput) (any, error) {
+	items, total, err := a.ipc.FindChannelsForDevice(c.Request.Context(), in)
 
 	// 按照在线优先排序
 	sort.SliceStable(items, func(i, j int) bool {
@@ -140,8 +166,8 @@ func (a GB28181API) FindChannelsForDevice(c *gin.Context, in *gb28181.FindDevice
 
 // >>> channel >>>>>>>>>>>>>>>>>>>>
 
-func (a GB28181API) findChannel(c *gin.Context, in *gb28181.FindChannelInput) (any, error) {
-	items, total, err := a.gb28181Core.FindChannel(c.Request.Context(), in)
+func (a IPCAPI) findChannel(c *gin.Context, in *ipc.FindChannelInput) (any, error) {
+	items, total, err := a.ipc.FindChannel(c.Request.Context(), in)
 	return gin.H{"items": items, "total": total}, err
 }
 
@@ -150,9 +176,9 @@ func (a GB28181API) findChannel(c *gin.Context, in *gb28181.FindChannelInput) (a
 // 	return a.gb28181Core.GetChannel(c.Request.Context(), channelID)
 // }
 
-func (a GB28181API) editChannel(c *gin.Context, in *gb28181.EditChannelInput) (any, error) {
+func (a IPCAPI) editChannel(c *gin.Context, in *ipc.EditChannelInput) (any, error) {
 	cid := c.Param("id")
-	return a.gb28181Core.EditChannel(c.Request.Context(), in, cid)
+	return a.ipc.EditChannel(c.Request.Context(), in, cid)
 }
 
 // func (a GB28181API) addChannel(c *gin.Context, in *gb28181.AddChannelInput) (any, error) {
@@ -164,7 +190,7 @@ func (a GB28181API) editChannel(c *gin.Context, in *gb28181.EditChannelInput) (a
 // 	return a.gb28181Core.DelChannel(c.Request.Context(), channelID)
 // }
 
-func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
+func (a IPCAPI) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 	channelID := c.Param("id")
 
 	var app, appStream, host, stream, session, mediaServerID string
@@ -176,7 +202,7 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 			return nil, reason.ErrUsedLogic.SetMsg("请先配置流媒体 SDP 收流地址")
 		}
 		// a.uc.SipServer.
-		ch, err := a.gb28181Core.GetChannel(c.Request.Context(), channelID)
+		ch, err := a.ipc.GetChannel(c.Request.Context(), channelID)
 		if err != nil {
 			return nil, err
 		}
@@ -272,15 +298,22 @@ func (a GB28181API) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 
 	// 取一张快照
 	go func() {
-		body, err := a.uc.SMSAPI.smsCore.GetSnapshot(svr, zlm.GetSnapRequest{
-			URL:        out.Items[0].RTSP,
-			TimeoutSec: 10,
-			ExpireSec:  15,
-		})
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)
-		} else {
-			writeCover(a.uc.Conf.ConfigDir, channelID, body)
+		for range 2 {
+			time.Sleep(5 * time.Second)
+			rtsp := fmt.Sprintf("rtsp://%s:%d/%s", "127.0.0.1", svr.Ports.RTSP, stream) + "?" + session
+			body, err := a.uc.SMSAPI.smsCore.GetSnapshot(svr, zlm.GetSnapRequest{
+				URL:        rtsp,
+				TimeoutSec: 10,
+				ExpireSec:  15,
+			})
+			if err != nil {
+				slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)
+				continue
+			}
+			if err := writeCover(a.uc.Conf.ConfigDir, channelID, body); err != nil {
+				slog.ErrorContext(c.Request.Context(), "write cover", "err", err)
+			}
+			break
 		}
 	}()
 	return &out, nil
@@ -293,7 +326,7 @@ type refreshSnapshotInput struct {
 	URL string `json:"url"`
 }
 
-func (a GB28181API) refreshSnapshot(c *gin.Context, in *refreshSnapshotInput) (any, error) {
+func (a IPCAPI) refreshSnapshot(c *gin.Context, in *refreshSnapshotInput) (any, error) {
 	channelID := c.Param("id")
 
 	path := readCoverPath(a.uc.Conf.ConfigDir, channelID)
@@ -329,7 +362,9 @@ func (a GB28181API) refreshSnapshot(c *gin.Context, in *refreshSnapshotInput) (a
 			// return nil, reason.ErrBadRequest.Msg(err.Error())
 		} else {
 			if hook.MD5FromBytes(img) != "" {
-				writeCover(a.uc.Conf.ConfigDir, channelID, img)
+				if err := writeCover(a.uc.Conf.ConfigDir, channelID, img); err != nil {
+					slog.ErrorContext(c.Request.Context(), "write cover", "err", err)
+				}
 			}
 		}
 	}
@@ -337,12 +372,68 @@ func (a GB28181API) refreshSnapshot(c *gin.Context, in *refreshSnapshotInput) (a
 	return gin.H{"link": fmt.Sprintf("%s/channels/%s/snapshot?token=%s", prefix, channelID, token)}, nil
 }
 
-func (a GB28181API) getSnapshot(c *gin.Context) {
+func (a IPCAPI) getSnapshot(c *gin.Context) {
 	channelID := c.Param("id")
 	body, err := readCover(a.uc.Conf.ConfigDir, channelID)
 	if err != nil {
-		reason.ErrNotFound.SetMsg(err.Error())
+		web.Fail(c, reason.ErrNotFound.SetMsg(err.Error()))
 		return
 	}
 	c.Data(200, "image/jpeg", body)
+}
+
+type DiscoverResponse struct {
+	Addr string `json:"addr"`
+}
+
+func toDiscoverResponse(dev *onvif.Device) *DiscoverResponse {
+	addr := dev.GetDeviceParams().Xaddr
+	if !strings.Contains(addr, ":") {
+		addr += ":80"
+	}
+	return &DiscoverResponse{
+		Addr: addr,
+	}
+}
+
+func (a IPCAPI) discover(c *gin.Context) {
+	recv, cancel, err := onvif.AllAvailableDevicesAtSpecificEthernetInterfaces()
+	if err != nil {
+		web.Fail(c, err)
+		return
+	}
+	defer cancel()
+
+	se := web.NewSSE(64, time.Minute)
+	go func() {
+		defer func() {
+			se.Publish(web.Event{
+				ID:    uuid.NewString(),
+				Event: "end",
+			})
+			se.Close()
+		}()
+		for {
+			select {
+			case dev := <-recv:
+				if dev == nil {
+					return
+				}
+				// TODO: 已经添加的设备需要过滤掉
+				b, _ := json.Marshal(toDiscoverResponse(dev))
+				se.Publish(web.Event{
+					ID:    uuid.NewString(),
+					Event: "discover",
+					Data:  b,
+				})
+				time.Sleep(time.Millisecond * 200)
+			case <-c.Request.Context().Done():
+				return
+			case <-time.After(3 * time.Second):
+				slog.DebugContext(c.Request.Context(), "discover timeout")
+				return
+			}
+		}
+	}()
+	se.ServeHTTP(c.Writer, c.Request)
 }

@@ -10,7 +10,7 @@ type Ext struct {
 
 // Scan implements orm.Scaner.
 func (i *Ext) Scan(input interface{}) error {
-	return orm.JsonUnmarshal(input, i)
+	return orm.JSONUnmarshal(input, i)
 }
 
 type SIPConfig struct {

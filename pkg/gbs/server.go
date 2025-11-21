@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/gowvp/gb28181/internal/conf"
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/gbs/m"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/conc"
-	"github.com/ixugo/goddd/pkg/system"
+	"github.com/ixugo/netpulse/ip"
 )
 
 type MemoryStorer interface {
@@ -42,11 +42,11 @@ type Server struct {
 	memoryStorer MemoryStorer
 }
 
-func NewServer(cfg *conf.Bootstrap, store gb28181.GB28181, sc sms.Core) (*Server, func()) {
+func NewServer(cfg *conf.Bootstrap, store gb28181.GBDAdapter, sc sms.Core) (*Server, func()) {
 	api := NewGB28181API(cfg, store, sc.NodeManager)
 
-	ip := system.LocalIP()
-	uri, _ := sip.ParseSipURI(fmt.Sprintf("sip:%s@%s:%d", cfg.Sip.ID, ip, cfg.Sip.Port))
+	iip := ip.InternalIP()
+	uri, _ := sip.ParseSipURI(fmt.Sprintf("sip:%s@%s:%d", cfg.Sip.ID, iip, cfg.Sip.Port))
 	from := sip.Address{
 		DisplayName: sip.String{Str: "gowvp"},
 		URI:         &uri,
@@ -61,7 +61,6 @@ func NewServer(cfg *conf.Bootstrap, store gb28181.GB28181, sc sms.Core) (*Server
 	msg.Handle("DeviceInfo", api.sipMessageDeviceInfo)
 	msg.Handle("ConfigDownload", api.sipMessageConfigDownload)
 	msg.Handle("DeviceConfig", api.handleDeviceConfig)
-
 	// msg.Handle("RecordInfo", api.handlerMessage)
 
 	c := Server{

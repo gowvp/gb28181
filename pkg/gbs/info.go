@@ -3,7 +3,7 @@ package gbs
 import (
 	"encoding/hex"
 
-	"github.com/gowvp/gb28181/internal/core/gb28181"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 )
 
@@ -43,14 +43,14 @@ func (g GB28181API) sipMessageDeviceInfo(ctx *sip.Context) {
 		return
 	}
 
-	if err := g.core.Edit(ctx.DeviceID, func(d *gb28181.Device) {
+	if err := g.core.Edit(ctx.DeviceID, func(d *ipc.Device) {
 		d.Ext.Firmware = msg.Firmware
 		d.Ext.Manufacturer = msg.Manufacturer
 		d.Ext.Model = msg.Model
 		d.Ext.Name = msg.DeviceName
 
 		d.Address = ctx.Source.String()
-		d.Trasnport = ctx.Source.Network()
+		d.Transport = ctx.Source.Network()
 	}); err != nil {
 		ctx.Log.Error("Edit", "err", err)
 		ctx.String(500, ErrDatabase.Error())

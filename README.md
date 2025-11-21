@@ -14,7 +14,7 @@ go wvp 是 Go 语言实现的开源 GB28181 解决方案，基于 GB28181-2022 �
 
 ## 在线演示平台
 
-+ [在线演示平台 :) (服务器已过期，暂不提供演示)](http://wvp.golang.space:15123/)
++ [在线演示平台 :) ](http://gowvp.golang.space:15123/)
 
 ![](./docs/demo/play.gif)
 
@@ -35,7 +35,7 @@ go wvp 是 Go 语言实现的开源 GB28181 解决方案，基于 GB28181-2022 �
 
 ## 开源库
 
-感谢 @panjjo 大佬的开源库 [panjjo/gosip](https://github.com/panjjo/gosip)，GoWVP 的 sip 信令基于此库，出于底层封装需要，并非直接 go mod 依赖该项目，而是源代码放到了 pkg 包中。
+感谢 @panjjo 大佬的开源库 [panjjo/gosip](https://github.com/panjjo/gosip)，GoWVP 的 sip 信令基于此库，出于底层封装需要，并非直接依赖该项目，而是源代码放到了 pkg 包中。
 
 流媒体服务基于@夏楚 [ZLMediaKit](https://github.com/ZLMediaKit/ZLMediaKit)
 
@@ -102,8 +102,11 @@ zlm 能否访问到 gowvp?? docker 合并版本填写 127.0.0.1 即可，分离�
 在反向代理那里配置以下参数，其中域名根据实际的填写
 
 proxy_set_header X-Forwarded-Host $host;
+
 proxy_set_header X-Forwarded-Prefix "https://gowvp.com";
+
 proxy_set_header Upgrade $http_upgrade;
+
 proxy_set_header Connection "upgrade";
 
 
