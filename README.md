@@ -8,9 +8,9 @@
     <!-- <a href="https://github.com/ixugo/goddd/blob/master/LICENSE.txt"><img src="https://img.shields.io/dub/l/vibe-d.svg" alt="License"/></a> -->
 </p>
 
-# 开箱即用的 GB/T28181 协议视频平台
+# 开箱即用的视频监控平台
 
-go wvp 是 Go 语言实现的开源 GB28181 解决方案，基于 GB28181-2022 标准实现的网络视频平台，同时支持 2016/2011 版本，支持 rtmp/rtsp，客户端支持网页版本和安卓 App。
+go wvp 是 Go 语言实现的开源 GB28181 解决方案，基于 GB28181-2022 标准实现的网络视频平台，同时支持 2016/2011 版本，支持 ONVIF/RTMP/RTSP 等协议。
 
 ## 在线演示平台
 
