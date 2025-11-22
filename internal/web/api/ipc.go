@@ -2,25 +2,24 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/gowvp/gb28181/internal/adapter/onvifadapter"
 	"github.com/gowvp/gb28181/internal/core/bz"
 	"github.com/gowvp/gb28181/internal/core/ipc"
-	"github.com/gowvp/gb28181/internal/core/port"
 	"github.com/gowvp/gb28181/internal/core/push"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/zlm"
-	"github.com/gowvp/onvif"
 	"github.com/ixugo/goddd/domain/uniqueid"
 	"github.com/ixugo/goddd/pkg/hook"
 	"github.com/ixugo/goddd/pkg/orm"
@@ -61,7 +60,7 @@ func NewIPCAPI(core ipc.Core) IPCAPI {
 	return IPCAPI{ipc: core}
 }
 
-func NewIPCCore(store ipc.Storer, uni uniqueid.Core, protocols map[string]port.Protocol) ipc.Core {
+func NewIPCCore(store ipc.Storer, uni uniqueid.Core, protocols map[string]ipc.Protocoler) ipc.Core {
 	return ipc.NewCore(store, uni, protocols)
 }
 
@@ -92,8 +91,9 @@ func registerGB28181(g gin.IRouter, api IPCAPI, handler ...gin.HandlerFunc) {
 		group.POST("/:id/catalog", web.WrapH(api.queryCatalog)) // 刷新通道（GB28181 特有）
 	}
 	{
-		group := g.Group("/onvif", handler...)
-		group.GET("/discover", api.discover) // ONVIF 设备发现（ONVIF 特有）
+		// group := g.Group("/onvif", handler...)
+		g.GET("/onvif/discover", api.discover) // ONVIF 设备发现（ONVIF 特有）
+		// group.GET("/discover", api.discover)   // ONVIF 设备发现（ONVIF 特有）
 	}
 
 	// 统一的通道管理 API（支持所有协议）
@@ -137,6 +137,10 @@ func (a IPCAPI) editDevice(c *gin.Context, in *ipc.EditDeviceInput) (any, error)
 //	POST /devices
 //	{ "type": "ONVIF", "ip": "192.168.1.100", "port": 80, "username": "admin", "password": "12345" }
 func (a IPCAPI) addDevice(c *gin.Context, in *ipc.AddDeviceInput) (any, error) {
+	in.Type = strings.ToUpper(in.Type)
+	if !slices.Contains([]string{ipc.TypeGB28181, ipc.TypeOnvif}, in.Type) {
+		return nil, reason.ErrBadRequest.SetMsg("不支持的设备类型")
+	}
 	return a.ipc.AddDevice(c.Request.Context(), in)
 }
 
@@ -196,7 +200,7 @@ func (a IPCAPI) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 	var app, appStream, host, stream, session, mediaServerID string
 
 	// 国标逻辑
-	if strings.HasPrefix(channelID, bz.IDPrefixGBChannel) {
+	if bz.IsGB28181(channelID) {
 		// 防止错误的配置，无法收到流
 		if a.uc.Conf.Media.SDPIP == "127.0.0.1" {
 			return nil, reason.ErrUsedLogic.SetMsg("请先配置流媒体 SDP 收流地址")
@@ -212,7 +216,7 @@ func (a IPCAPI) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 
 		mediaServerID = sms.DefaultMediaServerID
 
-	} else if strings.HasPrefix(channelID, bz.IDPrefixRTMP) {
+	} else if bz.IsRTMP(channelID) {
 		pu, err := a.uc.MediaAPI.pushCore.GetStreamPush(c.Request.Context(), channelID)
 		if err != nil {
 			return nil, err
@@ -227,13 +231,17 @@ func (a IPCAPI) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 		if !pu.IsAuthDisabled && pu.Session != "" {
 			session = "session=" + pu.Session
 		}
-	} else if strings.HasPrefix(channelID, bz.IDPrefixRTSP) {
+	} else if bz.IsRTSP(channelID) {
 		proxy, err := a.uc.ProxyAPI.proxyCore.GetStreamProxy(c.Request.Context(), channelID)
 		if err != nil {
 			return nil, err
 		}
 		app = proxy.App
 		appStream = proxy.Stream
+		mediaServerID = sms.DefaultMediaServerID
+	} else if bz.IsOnvif(channelID) {
+		app = "rtp"
+		appStream = channelID
 		mediaServerID = sms.DefaultMediaServerID
 	} else {
 		return nil, reason.ErrNotFound.SetMsg("不支持的播放通道")
@@ -299,7 +307,7 @@ func (a IPCAPI) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 	// 取一张快照
 	go func() {
 		for range 2 {
-			time.Sleep(5 * time.Second)
+			time.Sleep(3 * time.Second)
 			rtsp := fmt.Sprintf("rtsp://%s:%d/%s", "127.0.0.1", svr.Ports.RTSP, stream) + "?" + session
 			body, err := a.uc.SMSAPI.smsCore.GetSnapshot(svr, zlm.GetSnapRequest{
 				URL:        rtsp,
@@ -382,27 +390,13 @@ func (a IPCAPI) getSnapshot(c *gin.Context) {
 	c.Data(200, "image/jpeg", body)
 }
 
-type DiscoverResponse struct {
-	Addr string `json:"addr"`
-}
-
-func toDiscoverResponse(dev *onvif.Device) *DiscoverResponse {
-	addr := dev.GetDeviceParams().Xaddr
-	if !strings.Contains(addr, ":") {
-		addr += ":80"
-	}
-	return &DiscoverResponse{
-		Addr: addr,
-	}
-}
-
 func (a IPCAPI) discover(c *gin.Context) {
-	recv, cancel, err := onvif.AllAvailableDevicesAtSpecificEthernetInterfaces()
-	if err != nil {
-		web.Fail(c, err)
+	p := a.ipc.GetProtocol(ipc.TypeOnvif)
+	onvifAdapter, ok := p.(*onvifadapter.Adapter)
+	if !ok {
+		web.Fail(c, reason.ErrNotFound.SetMsg("不支持的协议"))
 		return
 	}
-	defer cancel()
 
 	se := web.NewSSE(64, time.Minute)
 	go func() {
@@ -413,27 +407,25 @@ func (a IPCAPI) discover(c *gin.Context) {
 			})
 			se.Close()
 		}()
-		for {
-			select {
-			case dev := <-recv:
-				if dev == nil {
-					return
-				}
-				// TODO: 已经添加的设备需要过滤掉
-				b, _ := json.Marshal(toDiscoverResponse(dev))
-				se.Publish(web.Event{
-					ID:    uuid.NewString(),
-					Event: "discover",
-					Data:  b,
-				})
-				time.Sleep(time.Millisecond * 200)
-			case <-c.Request.Context().Done():
-				return
-			case <-time.After(3 * time.Second):
-				slog.DebugContext(c.Request.Context(), "discover timeout")
-				return
-			}
+		w := IOWriter{fn: func(b []byte) (int, error) {
+			se.Publish(web.Event{
+				ID:    uuid.NewString(),
+				Event: "discover",
+				Data:  b,
+			})
+			return len(b), nil
+		}}
+		if err := onvifAdapter.Discover(c.Request.Context(), w); err != nil {
+			slog.ErrorContext(c.Request.Context(), "discover", "err", err)
 		}
 	}()
 	se.ServeHTTP(c.Writer, c.Request)
+}
+
+type IOWriter struct {
+	fn func(b []byte) (int, error)
+}
+
+func (w IOWriter) Write(b []byte) (int, error) {
+	return w.fn(b)
 }

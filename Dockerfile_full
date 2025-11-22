@@ -3,6 +3,9 @@ FROM debian:bullseye-slim
 ENV TZ=Asia/Shanghai
 WORKDIR /opt/media/bin/
 
+RUN sed -i 's|http://deb.debian.org|http://mirrors.tuna.tsinghua.edu.cn|g; \
+            s|http://security.debian.org|http://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tzdata \
@@ -12,14 +15,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=zlmediakit/zlmediakit:master /opt/media/bin /opt/media/bin
+COPY --from=mwader/static-ffmpeg:6.1 /ffmpeg /usr/local/bin/ffmpeg
 
 ADD ./build/linux_amd64/bin ./gowvp
 ADD ./www ./www
 
 RUN mkdir -p configs
 
+RUN ln -sf /usr/local/bin/ffmpeg /usr/bin/ffmpeg && \
+    chmod +x /usr/local/bin/ffmpeg
+
+RUN ln -sf /usr/local/bin/ffmpeg /opt/media/bin/ffmpeg
+
+
 LABEL Name=gowvp \
-      Version=0.0.1 \
+      Version=0.1.0 \
       Maintainer="xx@golang.space" \
       Description="gowvp & zlmediakit"
 

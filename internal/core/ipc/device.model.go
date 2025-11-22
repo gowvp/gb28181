@@ -5,14 +5,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gowvp/gb28181/internal/core/bz"
 	"github.com/ixugo/goddd/pkg/orm"
 )
 
 // Device domain model
 type Device struct {
-	ID           string    `gorm:"primaryKey" json:"id"`
-	Type         string    `gorm:"column:type;notNull;default:'';comment:设备类型(onvif)" json:"type"`                                             // 设备类型(onvif/gb28181)
-	DeviceID     string    `gorm:"column:device_id;notNull;uniqueIndex;default:'';comment:20 位国标编号" json:"device_id"`                          // 20 位国标编号
+	ID   string `gorm:"primaryKey" json:"id"`
+	Type string `gorm:"column:type;notNull;default:'';comment:设备类型(onvif)" json:"type"` // 设备类型(onvif/gb28181)
+
+	// 自定义 id 可以简写为 did，国标 device_id 应简写成 gbid，而不是 device_id
+	// 起这个名义会难以区分，但为了兼容已经部署的旧数据库...保留
+	DeviceID string `gorm:"column:device_id;notNull;uniqueIndex;default:'';comment:20 位国标编号" json:"device_id"` // 20 位国标编号
+
 	Name         string    `gorm:"column:name;notNull;default:'';comment:设备名称" json:"name"`                                                    // 设备名称
 	Transport    string    `gorm:"column:transport;notNull;default:'';comment:传输协议(tcp/udp)" json:"transport"`                                 // 传输协议(TCP/UDP)
 	StreamMode   int8      `gorm:"column:stream_mode;notNull;default:1;comment:数据传输模式(0:UDP; 1:TCP_PASSIVE; 2:TCP_ACTIVE)" json:"stream_mode"` // 数据传输模式
@@ -29,18 +34,17 @@ type Device struct {
 	Password     string    `gorm:"column:password;notNull;default:'';comment:注册密码" json:"password"`
 	Address      string    `gorm:"column:address;notNull;default:'';comment:设备网络地址" json:"address"`
 	Ext          DeviceExt `gorm:"column:ext;notNull;default:'{}';type:jsonb;comment:设备属性" json:"ext"` // 设备属性
-	// onvif
-	Username string `gorm:"column:username;notNull;default:'';comment:用户名" json:"username"`
+	Username     string    `gorm:"column:username;notNull;default:'';comment:用户名" json:"username"`
 
 	Children []*Channel `gorm:"-" json:"children,omitzero"`
 }
 
 func (d *Device) IsOnvif() bool {
-	return strings.ToUpper(d.Type) == "ONVIF"
+	return strings.HasPrefix(d.ID, bz.IDPrefixOnvif) || d.Type == TypeOnvif
 }
 
 func (d *Device) IsGB28181() bool {
-	return strings.ToUpper(d.Type) == "GB28181" || d.Type == ""
+	return strings.HasPrefix(d.ID, bz.IDPrefixGB) || d.Type == TypeGB28181 || d.Type == ""
 }
 
 // TableName database table name
@@ -49,7 +53,7 @@ func (*Device) TableName() string {
 }
 
 func (d Device) Check() error {
-	if d.IsGB28181() && len(d.DeviceID) < 18 {
+	if d.IsGB28181() && len(d.Username) < 18 {
 		return fmt.Errorf("国标 ID 长度应大于等于 18 位")
 	}
 	if d.IsOnvif() {
@@ -69,9 +73,9 @@ func (d Device) Check() error {
 	return nil
 }
 
-func (d *Device) init(id, deviceID string) {
+func (d *Device) init(id, gbid string) {
 	d.ID = id
-	d.DeviceID = deviceID
+	d.DeviceID = gbid
 }
 
 func (d *Device) NetworkAddress() string {
@@ -83,12 +87,18 @@ func (d *Device) GetID() string {
 	return d.ID
 }
 
-func (d *Device) GetDeviceID() string {
+func (d *Device) GetGB28181DeviceID() string {
+	// if d.Username != "" {
+	// return d.Username
+	// }
 	return d.DeviceID
 }
 
 func (d *Device) GetType() string {
-	return d.Type
+	if d.Type != "" {
+		return d.Type
+	}
+	return GetType(d.ID)
 }
 
 func (d *Device) GetIP() string {

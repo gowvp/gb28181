@@ -1,6 +1,7 @@
 package gbs
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net"
@@ -47,7 +48,7 @@ func (g *GB28181API) stopPlay(ch *Channel, in *StopPlayInput) error {
 }
 
 // StopPlay 加锁的停止播放
-func (g *GB28181API) StopPlay(in *StopPlayInput) error {
+func (g *GB28181API) StopPlay(ctx context.Context, in *StopPlayInput) error {
 	ch, ok := g.svr.memoryStorer.GetChannel(in.Channel.DeviceID, in.Channel.ChannelID)
 	if !ok {
 		return ErrDeviceNotExist
@@ -57,7 +58,7 @@ func (g *GB28181API) StopPlay(in *StopPlayInput) error {
 	defer ch.device.playMutex.Unlock()
 
 	defer func() {
-		g.svr.gb.core.EditPlaying(in.Channel.DeviceID, in.Channel.ChannelID, false)
+		g.svr.gb.core.EditPlaying(ctx, in.Channel.DeviceID, in.Channel.ChannelID, false)
 	}()
 	return g.stopPlay(ch, in)
 }
@@ -109,7 +110,7 @@ func (g *GB28181API) Play(in *PlayInput) error {
 		return err
 	}
 
-	g.svr.gb.core.EditPlaying(in.Channel.DeviceID, in.Channel.ChannelID, true)
+	g.svr.gb.core.EditPlaying(context.TODO(), in.Channel.DeviceID, in.Channel.ChannelID, true)
 
 	return nil
 }

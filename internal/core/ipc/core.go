@@ -2,7 +2,6 @@
 package ipc
 
 import (
-	"github.com/gowvp/gb28181/internal/core/port"
 	"github.com/ixugo/goddd/domain/uniqueid"
 )
 
@@ -16,14 +15,18 @@ type Storer interface {
 type Core struct {
 	store     Storer
 	uniqueID  uniqueid.Core
-	protocols map[string]port.Protocol // 协议映射
+	protocols map[string]Protocoler // 协议映射（Protocol 在同一个包内）
 }
 
 // NewCore create business domain
-func NewCore(store Storer, uni uniqueid.Core, protocols map[string]port.Protocol) Core {
+func NewCore(store Storer, uni uniqueid.Core, protocols map[string]Protocoler) Core {
 	return Core{
 		store:     store,
 		uniqueID:  uni,
 		protocols: protocols,
 	}
+}
+
+func (c *Core) GetProtocol(atype string) Protocoler {
+	return c.protocols[atype]
 }

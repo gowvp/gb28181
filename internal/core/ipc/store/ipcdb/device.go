@@ -4,12 +4,12 @@ package ipcdb
 import (
 	"context"
 
-	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/ixugo/goddd/pkg/orm"
 	"gorm.io/gorm"
 )
 
-var _ gb28181.DeviceStorer = Device{}
+var _ ipc.DeviceStorer = Device{}
 
 // Device Related business namespaces
 type Device DB
@@ -19,28 +19,28 @@ func NewDevice(db *gorm.DB) Device {
 	return Device{db: db}
 }
 
-// Find implements gb28181.DeviceStorer.
-func (d Device) Find(ctx context.Context, bs *[]*gb28181.Device, page orm.Pager, opts ...orm.QueryOption) (int64, error) {
+// Find implements ipc.DeviceStorer.
+func (d Device) Find(ctx context.Context, bs *[]*ipc.Device, page orm.Pager, opts ...orm.QueryOption) (int64, error) {
 	return orm.FindWithContext(ctx, d.db, bs, page, opts...)
 }
 
-// Get implements gb28181.DeviceStorer.
-func (d Device) Get(ctx context.Context, model *gb28181.Device, opts ...orm.QueryOption) error {
+// Get implements ipc.DeviceStorer.
+func (d Device) Get(ctx context.Context, model *ipc.Device, opts ...orm.QueryOption) error {
 	return orm.FirstWithContext(ctx, d.db, model, opts...)
 }
 
-// Add implements gb28181.DeviceStorer.
-func (d Device) Add(ctx context.Context, model *gb28181.Device) error {
+// Add implements ipc.DeviceStorer.
+func (d Device) Add(ctx context.Context, model *ipc.Device) error {
 	return d.db.WithContext(ctx).Create(model).Error
 }
 
-// Edit implements gb28181.DeviceStorer.
-func (d Device) Edit(ctx context.Context, model *gb28181.Device, changeFn func(*gb28181.Device), opts ...orm.QueryOption) error {
+// Edit implements ipc.DeviceStorer.
+func (d Device) Edit(ctx context.Context, model *ipc.Device, changeFn func(*ipc.Device), opts ...orm.QueryOption) error {
 	return orm.UpdateWithContext(ctx, d.db, model, changeFn, opts...)
 }
 
-// Del implements gb28181.DeviceStorer.
-func (d Device) Del(ctx context.Context, model *gb28181.Device, opts ...orm.QueryOption) error {
+// Del implements ipc.DeviceStorer.
+func (d Device) Del(ctx context.Context, model *ipc.Device, opts ...orm.QueryOption) error {
 	return orm.DeleteWithContext(ctx, d.db, model, opts...)
 }
 
@@ -55,6 +55,6 @@ func (d Device) Session(ctx context.Context, changeFns ...func(*gorm.DB) error) 
 	})
 }
 
-func (d Device) EditWithSession(tx *gorm.DB, model *gb28181.Device, changeFn func(b *gb28181.Device) error, opts ...orm.QueryOption) error {
+func (d Device) EditWithSession(tx *gorm.DB, model *ipc.Device, changeFn func(b *ipc.Device) error, opts ...orm.QueryOption) error {
 	return orm.UpdateWithSession(tx, model, changeFn, opts...)
 }

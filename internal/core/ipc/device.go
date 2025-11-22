@@ -5,7 +5,6 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/gowvp/gb28181/internal/core/bz"
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/reason"
 	"github.com/ixugo/goddd/pkg/web"
@@ -104,17 +103,17 @@ func (c Core) AddDevice(ctx context.Context, in *AddDeviceInput) (*Device, error
 	}
 
 	// 协议验证（通过接口调用）
-	if protocol, ok := c.protocols[out.Type]; ok {
+	if protocol, ok := c.protocols[out.GetType()]; ok {
 		if err := protocol.ValidateDevice(ctx, &out); err != nil {
 			return nil, reason.ErrBadRequest.SetMsg(err.Error())
 		}
 	}
 
+	out.ID = GenerateDID(&out, c.uniqueID)
 	if out.IsOnvif() {
-		out.ID = c.uniqueID.UniqueID(bz.IDPrefixOnvif)
 		out.DeviceID = out.ID
 	} else {
-		out.ID = c.uniqueID.UniqueID(bz.IDPrefixGB)
+		out.Username = out.DeviceID
 	}
 
 	if err := out.Check(); err != nil {
@@ -130,7 +129,7 @@ func (c Core) AddDevice(ctx context.Context, in *AddDeviceInput) (*Device, error
 	}
 
 	// 初始化协议连接（失败不影响设备添加）
-	if protocol, ok := c.protocols[out.Type]; ok {
+	if protocol, ok := c.protocols[out.GetType()]; ok {
 		if err := protocol.InitDevice(ctx, &out); err != nil {
 			slog.WarnContext(ctx, "初始化协议失败", "err", err, "device_id", out.ID)
 		}
@@ -158,5 +157,22 @@ func (c Core) DelDevice(ctx context.Context, id string) (*Device, error) {
 	if err := c.store.Device().Del(ctx, &dev, orm.Where("id=?", id)); err != nil {
 		return nil, reason.ErrDB.Withf(`Del err[%s]`, err.Error())
 	}
+
+	if err := c.store.Channel().Session(ctx, func(tx *gorm.DB) error {
+		if err := orm.Delete(tx, &dev, orm.Where("id=?", id)); err != nil {
+			return err
+		}
+		if protocol, ok := c.protocols[dev.GetType()]; ok {
+			if err := protocol.DeleteDevice(ctx, &dev); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, func(d *gorm.DB) error {
+		return d.Where("did=?", id).Delete(&Channel{}).Error
+	}); err != nil {
+		return nil, reason.ErrDB.Withf(`DelChannel err[%s]`, err.Error())
+	}
+
 	return &dev, nil
 }

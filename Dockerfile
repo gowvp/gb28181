@@ -10,7 +10,6 @@ RUN apk --no-cache add ca-certificates \
 WORKDIR /app
 
 ADD ./build/linux_${TARGETARCH}/bin ./
-ADD ./configs/config.toml /app/configs/config.toml
 ADD ./www /app/www
 
 LABEL Name=gowvp Version=0.0.1

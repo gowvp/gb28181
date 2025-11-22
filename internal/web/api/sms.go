@@ -18,7 +18,7 @@ type SmsAPI struct {
 }
 
 func NewSMSCore(db *gorm.DB, cfg *conf.Bootstrap) sms.Core {
-	core := sms.NewCore(smsdb.NewDB(db).AutoMigrate(orm.EnabledAutoMigrate))
+	core := sms.NewCore(smsdb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()))
 	if err := core.Run(cfg, cfg.Server.HTTP.Port); err != nil {
 		panic(err)
 	}

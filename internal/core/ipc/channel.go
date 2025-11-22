@@ -11,6 +11,7 @@ import (
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/reason"
 	"github.com/jinzhu/copier"
+	"gorm.io/gorm"
 )
 
 // ChannelStorer Instantiation interface
@@ -22,6 +23,7 @@ type ChannelStorer interface {
 	Del(context.Context, *Channel, ...orm.QueryOption) error
 
 	BatchEdit(context.Context, string, any, ...orm.QueryOption) error // 批量更新一个字段
+	Session(ctx context.Context, changeFns ...func(*gorm.DB) error) error
 }
 
 // FindChannel Paginated search
@@ -83,6 +85,7 @@ func (c *Core) AddChannel(ctx context.Context, in *AddChannelInput) (*Channel, e
 
 // EditChannel Update object information
 func (c *Core) EditChannel(ctx context.Context, in *EditChannelInput, id string) (*Channel, error) {
+	// TODO: 修改 onvif 的账号/密码 后需要重新连接设备
 	var out Channel
 	if err := c.store.Channel().Edit(ctx, &out, func(b *Channel) {
 		if err := copier.Copy(b, in); err != nil {

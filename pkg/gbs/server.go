@@ -11,7 +11,8 @@ import (
 	"time"
 
 	"github.com/gowvp/gb28181/internal/conf"
-	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
+	"github.com/gowvp/gb28181/internal/core/bz"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/gbs/m"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
@@ -24,13 +25,13 @@ type MemoryStorer interface {
 	LoadDeviceToMemory(conn sip.Connection)               // 加载设备到内存
 	RangeDevices(fn func(key string, value *Device) bool) // 遍历设备
 
-	Change(deviceID string, changeFn func(*gb28181.Device), changeFn2 func(*Device)) error // 登出设备
+	Change(deviceID string, changeFn func(*ipc.Device), changeFn2 func(*Device)) error // 登出设备
 
 	Load(deviceID string) (*Device, bool)
 	Store(deviceID string, value *Device)
 	GetChannel(deviceID, channelID string) (*Channel, bool)
 
-	// Change(deviceID string, changeFn func(*gb28181.Device)) // 修改设备
+	// Change(deviceID string, changeFn func(*ipc.Device)) // 修改设备
 }
 
 type Server struct {
@@ -42,7 +43,7 @@ type Server struct {
 	memoryStorer MemoryStorer
 }
 
-func NewServer(cfg *conf.Bootstrap, store gb28181.GBDAdapter, sc sms.Core) (*Server, func()) {
+func NewServer(cfg *conf.Bootstrap, store ipc.Adapter, sc sms.Core) (*Server, func()) {
 	api := NewGB28181API(cfg, store, sc.NodeManager)
 
 	iip := ip.InternalIP()
@@ -90,18 +91,20 @@ func NewServer(cfg *conf.Bootstrap, store gb28181.GBDAdapter, sc sms.Core) (*Ser
 func (s *Server) startTickerCheck() {
 	conc.Timer(context.Background(), 60*time.Second, time.Second, func() {
 		now := time.Now()
-		s.memoryStorer.RangeDevices(func(key string, ipc *Device) bool {
-			if !ipc.IsOnline {
+		s.memoryStorer.RangeDevices(func(key string, dev *Device) bool {
+			if !dev.IsOnline {
 				return true
 			}
-
-			timeout := time.Duration(ipc.keepaliveTimeout) * time.Duration(ipc.keepaliveInterval) * time.Second
+			if !bz.IsGB28181(key) {
+				return true
+			}
+			timeout := time.Duration(dev.keepaliveTimeout) * time.Duration(dev.keepaliveInterval) * time.Second
 			if timeout <= 0 {
 				timeout = 3 * 60 * time.Second
 			}
 
-			if sub := now.Sub(ipc.LastKeepaliveAt); sub >= timeout || ipc.conn == nil {
-				s.gb.logout(key, func(d *gb28181.Device) {
+			if sub := now.Sub(dev.LastKeepaliveAt); sub >= timeout || dev.conn == nil {
+				s.gb.logout(key, func(d *ipc.Device) {
 					d.IsOnline = false
 				})
 			}
@@ -212,8 +215,8 @@ func (s *Server) Play(in *PlayInput) error {
 	return s.gb.Play(in)
 }
 
-func (s *Server) StopPlay(in *StopPlayInput) error {
-	return s.gb.StopPlay(in)
+func (s *Server) StopPlay(ctx context.Context, in *StopPlayInput) error {
+	return s.gb.StopPlay(ctx, in)
 }
 
 // QuerySnapshot 厂商实现抓图的少，sip 层已实现，先搁置

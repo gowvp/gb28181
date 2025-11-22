@@ -44,7 +44,7 @@ type Device struct {
 }
 
 func NewDevice(conn sip.Connection, d *ipc.Device) *Device {
-	uri, err := sip.ParseURI(fmt.Sprintf("sip:%s@%s", d.DeviceID, d.Address))
+	uri, err := sip.ParseURI(fmt.Sprintf("sip:%s@%s", d.GetGB28181DeviceID(), d.Address))
 	if err != nil {
 		slog.Error("parse uri", "err", err, "did", d.ID)
 		return nil

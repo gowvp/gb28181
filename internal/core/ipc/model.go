@@ -5,8 +5,31 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 
+	"github.com/gowvp/gb28181/internal/core/bz"
 	"github.com/ixugo/goddd/pkg/orm"
 )
+
+const (
+	TypeGB28181 = "GB28181"
+	TypeOnvif   = "ONVIF"
+	TypeRTSP    = "RTSP"
+	TypeRTMP    = "RTMP"
+)
+
+func GetType(stream string) string {
+	switch true {
+	case bz.IsGB28181(stream):
+		return TypeGB28181
+	case bz.IsOnvif(stream):
+		return TypeOnvif
+	case bz.IsRTSP(stream):
+		return TypeRTSP
+	case bz.IsRTMP(stream):
+		return TypeRTMP
+	default:
+		return ""
+	}
+}
 
 // DeviceExt domain model
 type DeviceExt struct {

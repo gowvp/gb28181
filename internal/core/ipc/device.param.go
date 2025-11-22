@@ -52,7 +52,7 @@ type AddDeviceInput struct {
 	Name     string `json:"name"`     // 设备名称
 	Password string `json:"password"` // 注册密码
 
-	Type string `json:"type"` // 设备类型(onvif/gb28181)
+	Type string `json:"type"` // 设备类型(ONVIF/GB28181)
 
 	// Addr     string `json:"addr"`     // 地址(ip:port)
 

@@ -5,14 +5,17 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/gowvp/gb28181/internal/adapter/gbadapter"
+	"github.com/gowvp/gb28181/internal/adapter/onvifadapter"
+	"github.com/gowvp/gb28181/internal/adapter/rtspadapter"
 	"github.com/gowvp/gb28181/internal/conf"
 	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/internal/core/ipc/store/ipccache"
 	"github.com/gowvp/gb28181/internal/core/ipc/store/ipcdb"
-	"github.com/gowvp/gb28181/internal/core/port"
+	"github.com/gowvp/gb28181/internal/core/proxy"
 	"github.com/gowvp/gb28181/internal/core/push"
 	"github.com/gowvp/gb28181/internal/core/push/store/pushdb"
-	onvifadapter "github.com/gowvp/gb28181/internal/protocol/onvif"
+	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/gbs"
 	"github.com/ixugo/goddd/domain/uniqueid"
 	"github.com/ixugo/goddd/domain/uniqueid/store/uniqueiddb"
@@ -34,7 +37,7 @@ var (
 		NewPushCore, NewPushAPI,
 		gbs.NewServer,
 		NewIPCStore, NewProtocols, NewIPCCore, NewIPCAPI, NewGBAdapter,
-		NewProxyAPI,
+		NewProxyAPI, NewProxyCore,
 		NewConfigAPI,
 		NewUserAPI,
 	)
@@ -95,22 +98,18 @@ func NewIPCStore(db *gorm.DB) ipc.Storer {
 	return ipccache.NewCache(ipcdb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()))
 }
 
-func NewGBAdapter(store ipc.Storer, uni uniqueid.Core) ipc.GBDAdapter {
-	return ipc.NewGBAdapter(
+func NewGBAdapter(store ipc.Storer, uni uniqueid.Core) ipc.Adapter {
+	return ipc.NewAdapter(
 		store,
 		uni,
 	)
 }
 
 // NewProtocols 创建协议适配器映射
-func NewProtocols(store ipc.Storer) map[string]port.Protocol {
-	protocols := make(map[string]port.Protocol)
-
-	// 注册 ONVIF 协议适配器
-	protocols["ONVIF"] = onvifadapter.NewAdapter(store)
-
-	// TODO: 注册 GB28181 协议适配器
-	// protocols["GB28181"] = gb28181adapter.NewAdapter(sipServer, store)
-
+func NewProtocols(adapter ipc.Adapter, sms sms.Core, proxyCore *proxy.Core, gbs *gbs.Server) map[string]ipc.Protocoler {
+	protocols := make(map[string]ipc.Protocoler)
+	protocols[ipc.TypeOnvif] = onvifadapter.NewAdapter(adapter, sms)
+	protocols[ipc.TypeRTSP] = rtspadapter.NewAdapter(proxyCore, sms)
+	protocols[ipc.TypeGB28181] = gbadapter.NewAdapter(adapter, gbs, sms)
 	return protocols
 }

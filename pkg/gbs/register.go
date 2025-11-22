@@ -9,7 +9,7 @@ import (
 	"unicode"
 
 	"github.com/gowvp/gb28181/internal/conf"
-	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/internal/core/sms"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/conc"
@@ -20,7 +20,7 @@ const ignorePassword = "#"
 
 type GB28181API struct {
 	cfg  *conf.SIP
-	core gb28181.GBDAdapter
+	core ipc.Adapter
 
 	catalog *sip.Collector[Channels]
 
@@ -32,7 +32,7 @@ type GB28181API struct {
 	sms *sms.NodeManager
 }
 
-func NewGB28181API(cfg *conf.Bootstrap, store gb28181.GBDAdapter, sms *sms.NodeManager) *GB28181API {
+func NewGB28181API(cfg *conf.Bootstrap, store ipc.Adapter, sms *sms.NodeManager) *GB28181API {
 	g := GB28181API{
 		cfg:  &cfg.Sip,
 		core: store,
@@ -56,32 +56,35 @@ func NewGB28181API(cfg *conf.Bootstrap, store gb28181.GBDAdapter, sms *sms.NodeM
 		// 	}
 		// }
 
-		ipc, ok := g.svr.memoryStorer.Load(s)
+		d, ok := g.svr.memoryStorer.Load(s)
 		if ok {
 			for _, ch := range channel {
 				ch := Channel{
 					ChannelID: ch.ChannelID,
-					device:    ipc,
+					device:    d,
 				}
 				ch.init(g.cfg.Domain)
-				ipc.Channels.Store(ch.ChannelID, &ch)
+				d.Channels.Store(ch.ChannelID, &ch)
 			}
 		}
 
-		out := make([]*gb28181.Channel, len(channel))
+		out := make([]*ipc.Channel, len(channel))
 		for i, ch := range channel {
-			out[i] = &gb28181.Channel{
+			out[i] = &ipc.Channel{
 				DeviceID:  s,
 				ChannelID: ch.ChannelID,
 				Name:      ch.Name,
 				IsOnline:  ch.Status == "OK" || ch.Status == "ON",
-				Ext: gb28181.DeviceExt{
+				Ext: ipc.DeviceExt{
 					Manufacturer: ch.Manufacturer,
 					Model:        ch.Model,
 				},
+				Type: ipc.TypeGB28181,
 			}
 		}
-		g.core.SaveChannels(out)
+		if err := g.core.SaveChannels(out); err != nil {
+			slog.Error("SaveChannels", "err", err)
+		}
 	})
 	return &g
 }
@@ -131,19 +134,18 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		password = ""
 	}
 
-	hdrs := ctx.Request.GetHeaders("Authorization")
-	if len(hdrs) == 0 {
-		resp := sip.NewResponseFromRequest("", ctx.Request, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized), nil)
-		resp.AppendHeader(&sip.GenericHeader{HeaderName: "WWW-Authenticate", Contents: fmt.Sprintf(`Digest realm="%s",qop="auth",nonce="%s"`, g.cfg.Domain, sip.RandString(32))})
-		_ = ctx.Tx.Respond(resp)
-		return
-	}
-
 	if password != "" {
+		hdrs := ctx.Request.GetHeaders("Authorization")
+		if len(hdrs) == 0 {
+			resp := sip.NewResponseFromRequest("", ctx.Request, http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized), nil)
+			resp.AppendHeader(&sip.GenericHeader{HeaderName: "WWW-Authenticate", Contents: fmt.Sprintf(`Digest realm="%s",qop="auth",nonce="%s"`, g.cfg.Domain, sip.RandString(32))})
+			_ = ctx.Tx.Respond(resp)
+			return
+		}
 		authenticateHeader := hdrs[0].(*sip.GenericHeader)
 		auth := sip.AuthFromValue(authenticateHeader.Contents)
 		auth.SetPassword(password)
-		auth.SetUsername(dev.DeviceID)
+		auth.SetUsername(dev.GetGB28181DeviceID())
 		auth.SetMethod(ctx.Request.Method())
 		auth.SetURI(auth.Get("uri"))
 		if auth.CalcResponse() != auth.Get("response") {
@@ -165,7 +167,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	expire := ctx.GetHeader("Expires")
 	if expire == "0" {
 		ctx.Log.Info("设备注销")
-		g.logout(ctx.DeviceID, func(b *gb28181.Device) {
+		g.logout(ctx.DeviceID, func(b *ipc.Device) {
 			b.IsOnline = false
 			b.Address = ctx.Source.String()
 		})
@@ -173,7 +175,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		return
 	}
 
-	g.login(ctx, func(b *gb28181.Device) {
+	g.login(ctx, func(b *ipc.Device) {
 		b.IsOnline = true
 		b.RegisteredAt = orm.Now()
 		b.KeepaliveAt = orm.Now()
@@ -192,11 +194,11 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	respFn()
 
 	g.QueryDeviceInfo(ctx)
-	_ = g.QueryCatalog(dev.DeviceID)
-	_ = g.QueryConfigDownloadBasic(dev.DeviceID)
+	_ = g.QueryCatalog(dev.GetGB28181DeviceID())
+	_ = g.QueryConfigDownloadBasic(dev.GetGB28181DeviceID())
 }
 
-func (g GB28181API) login(ctx *sip.Context, fn func(d *gb28181.Device)) {
+func (g GB28181API) login(ctx *sip.Context, fn func(d *ipc.Device)) {
 	slog.Info("status change 设备上线", "device_id", ctx.DeviceID)
 	g.svr.memoryStorer.Change(ctx.DeviceID, fn, func(d *Device) {
 		d.conn = ctx.Request.GetConnection()
@@ -205,7 +207,7 @@ func (g GB28181API) login(ctx *sip.Context, fn func(d *gb28181.Device)) {
 	})
 }
 
-func (g GB28181API) logout(deviceID string, changeFn func(*gb28181.Device)) error {
+func (g GB28181API) logout(deviceID string, changeFn func(*ipc.Device)) error {
 	slog.Info("status change 设备离线", "device_id", deviceID)
 	return g.svr.memoryStorer.Change(deviceID, changeFn, func(d *Device) {
 		d.Expires = 0

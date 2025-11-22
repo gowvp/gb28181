@@ -35,8 +35,8 @@ func Run(bc *conf.Bootstrap) {
 	go setupZLM(ctx, bc.ConfigDir)
 
 	// 如果需要执行表迁移，递增此版本号和表更新说明
-	versionapi.DBVersion = "0.0.14"
-	versionapi.DBRemark = "add stream proxy"
+	versionapi.DBVersion = "0.0.17"
+	versionapi.DBRemark = "onvif device support"
 
 	handler, cleanUp, err := wireApp(bc, log)
 	if err != nil {
@@ -100,12 +100,6 @@ func setupZLM(ctx context.Context, dir string) {
 	workDir := system.Getwd()
 	configPath := filepath.Join(dir, "zlm.ini")
 
-	// 预创建命令实例，在循环中重用
-	cmd := exec.CommandContext(ctx, "./MediaServer", "-s", "default.pem", "-c", configPath)
-	cmd.Dir = workDir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -113,6 +107,12 @@ func setupZLM(ctx context.Context, dir string) {
 			return
 		default:
 			slog.Info("MediaServer 启动中...")
+			cmd := exec.CommandContext(ctx, "./MediaServer", "-s", "default.pem", "-c", configPath)
+			cmd.Dir = workDir
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Env = os.Environ()
+
 			// 启动命令 - 正常情况下会阻塞在这里
 			if err := cmd.Run(); err != nil {
 				slog.Error("zlm 运行失败", "err", err)
@@ -121,7 +121,7 @@ func setupZLM(ctx context.Context, dir string) {
 			}
 
 			// 等待后重启（不管是正常退出还是异常退出）
-			time.Sleep(5 * time.Second)
+			time.Sleep(2 * time.Second)
 		}
 	}
 }

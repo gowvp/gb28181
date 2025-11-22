@@ -194,6 +194,7 @@ func (n *NodeManager) connection(server *MediaServer, serverPort int) error {
 	log.Info("ZLM 服务节点配置设置")
 
 	hookPrefix := fmt.Sprintf("http://%s:%d/webhook", server.HookIP, serverPort)
+
 	req := zlm.SetServerConfigRequest{
 		RtcExternIP:          zlm.NewString(server.IP),
 		GeneralMediaServerID: zlm.NewString(server.ID),
@@ -232,6 +233,7 @@ func (n *NodeManager) connection(server *MediaServer, serverPort int) error {
 		// 优化此消息以更快的收到流注销事件
 		ProtocolContinuePushMs: zlm.NewString("3000"),
 		RtpProxyPortRange:      &server.RTPPortRange,
+		FfmpegLog:              zlm.NewString("./fflogs/ffmpeg.log"),
 	}
 
 	{

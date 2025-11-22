@@ -15,9 +15,12 @@ type ProxyAPI struct {
 	proxyCore *proxy.Core
 }
 
-func NewProxyAPI(db *gorm.DB, uni uniqueid.Core) ProxyAPI {
-	core := proxy.NewCore(proxydb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()), uni)
-	return ProxyAPI{proxyCore: core}
+func NewProxyCore(db *gorm.DB, uni uniqueid.Core) *proxy.Core {
+	return proxy.NewCore(proxydb.NewDB(db).AutoMigrate(orm.GetEnabledAutoMigrate()), uni)
+}
+
+func NewProxyAPI(proxyCore *proxy.Core) ProxyAPI {
+	return ProxyAPI{proxyCore: proxyCore}
 }
 
 func registerProxy(g gin.IRouter, api ProxyAPI, handler ...gin.HandlerFunc) {

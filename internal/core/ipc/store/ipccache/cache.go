@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"github.com/gowvp/gb28181/pkg/gbs"
 	"github.com/gowvp/gb28181/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/conc"
@@ -16,11 +16,11 @@ import (
 
 var (
 	_ gbs.MemoryStorer = &Cache{}
-	_ gb28181.Storer   = &Cache{}
+	_ ipc.Storer       = &Cache{}
 )
 
 type Cache struct {
-	gb28181.Storer
+	ipc.Storer
 
 	devices *conc.Map[string, *gbs.Device]
 }
@@ -30,15 +30,15 @@ func (c *Cache) LoadOrStore(deviceID string, value *gbs.Device) {
 	c.devices.LoadOrStore(deviceID, value)
 }
 
-func (c *Cache) Device() gb28181.DeviceStorer {
+func (c *Cache) Device() ipc.DeviceStorer {
 	return (*Device)(c)
 }
 
-func (c *Cache) Channel() gb28181.ChannelStorer {
+func (c *Cache) Channel() ipc.ChannelStorer {
 	return (*Channel)(c)
 }
 
-func NewCache(store gb28181.Storer) *Cache {
+func NewCache(store ipc.Storer) *Cache {
 	return &Cache{
 		Storer:  store,
 		devices: &conc.Map[string, *gbs.Device]{},
@@ -47,8 +47,9 @@ func NewCache(store gb28181.Storer) *Cache {
 
 // LoadDeviceToMemory implements gbs.MemoryStorer.
 func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
-	devices := make([]*gb28181.Device, 0, 100)
-	_, err := c.Storer.Device().Find(context.TODO(), &devices, web.NewPagerFilterMaxSize())
+	// TODO: 加载 gb28181 设备
+	devices := make([]*ipc.Device, 0, 100)
+	_, err := c.Storer.Device().Find(context.TODO(), &devices, web.NewPagerFilterMaxSize(), orm.Where("type != ?", ipc.TypeOnvif))
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +57,7 @@ func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
 	for _, d := range devices {
 		if strings.ToLower(d.Transport) == "tcp" {
 			// 通知相关设备/通道离线
-			c.Change(d.DeviceID, func(d *gb28181.Device) {
+			c.Change(d.GetGB28181DeviceID(), func(d *ipc.Device) {
 				d.IsOnline = false
 			}, func(d *gbs.Device) {
 				d.IsOnline = false
@@ -67,18 +68,18 @@ func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
 		dev := gbs.NewDevice(conn, d)
 		if dev != nil {
 			if err := dev.CheckConnection(); err != nil {
-				slog.Warn("检查设备连接失败", "err", err, "device_id", d.DeviceID, "to", dev.To())
+				slog.Warn("检查设备连接失败", "err", err, "username", d.GetGB28181DeviceID(), "to", dev.To())
 				continue
 			}
 
-			slog.Debug("load device to memory", "device_id", d.DeviceID, "to", dev.To())
-			channels := make([]*gb28181.Channel, 0, 8)
-			_, err := c.Storer.Channel().Find(context.TODO(), &channels, web.NewPagerFilterMaxSize(), orm.Where("device_id=?", d.DeviceID))
+			slog.Debug("load device to memory", "username", d.GetGB28181DeviceID(), "to", dev.To())
+			channels := make([]*ipc.Channel, 0, 8)
+			_, err := c.Storer.Channel().Find(context.TODO(), &channels, web.NewPagerFilterMaxSize(), orm.Where("device_id=?", d.GetGB28181DeviceID()))
 			if err != nil {
 				panic(err)
 			}
 			dev.LoadChannels(channels...)
-			c.devices.Store(d.DeviceID, dev)
+			c.devices.Store(d.GetGB28181DeviceID(), dev)
 		}
 	}
 }
@@ -89,8 +90,8 @@ func (c *Cache) RangeDevices(fn func(key string, value *gbs.Device) bool) {
 }
 
 // Change implements gbs.MemoryStorer.
-func (c *Cache) Change(deviceID string, changeFn func(*gb28181.Device), changeFn2 func(*gbs.Device)) error {
-	var dev gb28181.Device
+func (c *Cache) Change(deviceID string, changeFn func(*ipc.Device), changeFn2 func(*gbs.Device)) error {
+	var dev ipc.Device
 	if err := c.Storer.Device().Edit(context.TODO(), &dev, changeFn, orm.Where("device_id=?", deviceID)); err != nil {
 		return err
 	}

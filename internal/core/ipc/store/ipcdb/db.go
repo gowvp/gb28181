@@ -2,11 +2,11 @@
 package ipcdb
 
 import (
-	gb28181 "github.com/gowvp/gb28181/internal/core/ipc"
+	"github.com/gowvp/gb28181/internal/core/ipc"
 	"gorm.io/gorm"
 )
 
-var _ gb28181.Storer = DB{}
+var _ ipc.Storer = DB{}
 
 // DB Related business namespaces
 type DB struct {
@@ -19,12 +19,12 @@ func NewDB(db *gorm.DB) DB {
 }
 
 // Device Get business instance
-func (d DB) Device() gb28181.DeviceStorer {
+func (d DB) Device() ipc.DeviceStorer {
 	return Device(d)
 }
 
 // Channel Get business instance
-func (d DB) Channel() gb28181.ChannelStorer {
+func (d DB) Channel() ipc.ChannelStorer {
 	return Channel(d)
 }
 
@@ -34,8 +34,8 @@ func (d DB) AutoMigrate(ok bool) DB {
 		return d
 	}
 	if err := d.db.AutoMigrate(
-		new(gb28181.Device),
-		new(gb28181.Channel),
+		new(ipc.Device),
+		new(ipc.Channel),
 	); err != nil {
 		panic(err)
 	}
