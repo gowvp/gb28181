@@ -31,11 +31,12 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 		to:     ctx.To,
 	})
 
-	if err := g.svr.memoryStorer.Change(ctx.DeviceID, func(d *ipc.Device) {
+	if err := g.svr.memoryStorer.Change(ctx.DeviceID, func(d *ipc.Device) error {
 		d.KeepaliveAt = orm.Now()
 		d.IsOnline = msg.Status == "OK" || msg.Status == "ON"
 		d.Address = ctx.Source.String()
 		d.Transport = ctx.Source.Network()
+		return nil
 	}, func(d *Device) {
 		d.conn = ctx.Request.GetConnection()
 		d.source = ctx.Source

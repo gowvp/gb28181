@@ -35,8 +35,8 @@ func (d Device) Add(ctx context.Context, model *ipc.Device) error {
 }
 
 // Edit implements ipc.DeviceStorer.
-func (d Device) Edit(ctx context.Context, model *ipc.Device, changeFn func(*ipc.Device), opts ...orm.QueryOption) error {
-	return orm.UpdateWithContext(ctx, d.db, model, changeFn, opts...)
+func (d Device) Edit(ctx context.Context, model *ipc.Device, changeFn func(*ipc.Device) error, opts ...orm.QueryOption) error {
+	return orm.UpdateWithContext2(ctx, d.db, model, changeFn, opts...)
 }
 
 // Del implements ipc.DeviceStorer.

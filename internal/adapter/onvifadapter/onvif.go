@@ -87,10 +87,12 @@ func (a *Adapter) init() {
 					})
 					slog.Error("初始化 ONVIF 设备失败", "err", err, "device_id", device.ID)
 				}
+				if onvifDev == nil {
+					return
+				}
 				a.devices.Store(device.ID, &Device{
-					Device:      onvifDev,
-					KeepaliveAt: orm.Now(),
-					IsOnline:    err == nil,
+					Device:   onvifDev,
+					IsOnline: err == nil,
 				})
 			}(device)
 		}
@@ -98,12 +100,7 @@ func (a *Adapter) init() {
 }
 
 // ValidateDevice 实现 ipc.Protocol 接口 - ONVIF 设备验证
-//
-// 直接使用 *ipc.Device 作为参数，不需要类型断言！
 func (a *Adapter) ValidateDevice(ctx context.Context, dev *ipc.Device) error {
-	// 不需要类型断言，直接使用领域模型
-
-	// 直接访问领域模型的字段
 	onvifDev, err := onvif.NewDevice(onvif.DeviceParams{
 		Xaddr:      fmt.Sprintf("%s:%d", dev.IP, dev.Port),
 		Username:   dev.GetUsername(),
@@ -144,9 +141,8 @@ func (a *Adapter) InitDevice(ctx context.Context, dev *ipc.Device) error {
 
 	// 缓存设备连接
 	d := Device{
-		Device:      onvifDev,
-		KeepaliveAt: orm.Now(),
-		IsOnline:    true,
+		Device:   onvifDev,
+		IsOnline: true,
 	}
 	a.devices.Store(dev.ID, &d)
 
@@ -169,9 +165,8 @@ func (a *Adapter) QueryCatalog(ctx context.Context, dev *ipc.Device) error {
 			return fmt.Errorf("ONVIF 设备未初始化: %w", err)
 		}
 		onvifDev = &Device{
-			Device:      d,
-			KeepaliveAt: orm.Now(),
-			IsOnline:    true,
+			Device:   d,
+			IsOnline: true,
 		}
 		a.devices.Store(dev.ID, onvifDev)
 	}

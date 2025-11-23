@@ -25,7 +25,7 @@ type MemoryStorer interface {
 	LoadDeviceToMemory(conn sip.Connection)               // 加载设备到内存
 	RangeDevices(fn func(key string, value *Device) bool) // 遍历设备
 
-	Change(deviceID string, changeFn func(*ipc.Device), changeFn2 func(*Device)) error // 登出设备
+	Change(deviceID string, changeFn func(*ipc.Device) error, changeFn2 func(*Device)) error // 登出设备
 
 	Load(deviceID string) (*Device, bool)
 	Store(deviceID string, value *Device)
@@ -104,8 +104,9 @@ func (s *Server) startTickerCheck() {
 			}
 
 			if sub := now.Sub(dev.LastKeepaliveAt); sub >= timeout || dev.conn == nil {
-				s.gb.logout(key, func(d *ipc.Device) {
+				s.gb.logout(key, func(d *ipc.Device) error {
 					d.IsOnline = false
+					return nil
 				})
 			}
 			return true

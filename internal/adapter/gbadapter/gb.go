@@ -27,7 +27,7 @@ func NewAdapter(adapter ipc.Adapter, gbs *gbs.Server, smsCore sms.Core) *Adapter
 
 // InitDevice implements ipc.Protocoler.
 func (a *Adapter) InitDevice(ctx context.Context, device *ipc.Device) error {
-	panic("unimplemented")
+	return nil
 }
 
 // OnStreamChanged implements ipc.Protocoler.
@@ -80,5 +80,5 @@ func (a *Adapter) StopPlay(ctx context.Context, device *ipc.Device, channel *ipc
 
 // ValidateDevice implements ipc.Protocoler.
 func (a *Adapter) ValidateDevice(ctx context.Context, device *ipc.Device) error {
-	panic("unimplemented")
+	return nil
 }

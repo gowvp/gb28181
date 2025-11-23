@@ -2,7 +2,6 @@ package ipccache
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	"github.com/gowvp/gb28181/internal/core/ipc"
@@ -48,23 +47,25 @@ func (d *Device) Del(ctx context.Context, dev *ipc.Device, opts ...orm.QueryOpti
 }
 
 // Edit implements ipc.DeviceStorer.
-func (d *Device) Edit(ctx context.Context, dev *ipc.Device, changeFn func(*ipc.Device), opts ...orm.QueryOption) error {
+func (d *Device) Edit(ctx context.Context, dev *ipc.Device, changeFn func(*ipc.Device) error, opts ...orm.QueryOption) error {
 	if err := d.Storer.Device().Edit(ctx, dev, changeFn, opts...); err != nil {
 		return err
 	}
 	dev2, ok := d.devices.Load(dev.GetGB28181DeviceID())
-	if !ok {
-		return fmt.Errorf("edit device not found")
+	// TODO: 待重构
+	if dev.IsGB28181() && ok {
+		// 密码修改，设备需要重新注册
+		if dev2.Password != dev.Password && dev.Password != "" {
+			slog.InfoContext(ctx, " 修改密码，设备离线")
+			d.Change(dev.GetGB28181DeviceID(), func(d *ipc.Device) error {
+				d.Password = dev.Password
+				d.IsOnline = false
+				return nil
+			}, func(d *gbs.Device) {
+			})
+		}
 	}
-	// 密码修改，设备需要重新注册
-	if dev2.Password != dev.Password && dev.Password != "" {
-		slog.InfoContext(ctx, " 修改密码，设备离线")
-		d.Change(dev.GetGB28181DeviceID(), func(d *ipc.Device) {
-			d.Password = dev.Password
-			d.IsOnline = false
-		}, func(d *gbs.Device) {
-		})
-	}
+
 	return nil
 }
 

@@ -57,6 +57,10 @@ func (a *Adapter) startStatusChecker(ctx context.Context, interval, heartbeatTim
 		now := time.Now()
 
 		a.devices.Range(func(did string, dev *Device) bool {
+			if dev.KeepaliveAt.IsZero() {
+				return true
+			}
+
 			timeSinceLastKeepalive := now.Sub(dev.KeepaliveAt.Time)
 			isOnline := timeSinceLastKeepalive < heartbeatTimeout
 

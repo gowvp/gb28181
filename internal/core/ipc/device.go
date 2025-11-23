@@ -17,7 +17,7 @@ type DeviceStorer interface {
 	Find(context.Context, *[]*Device, orm.Pager, ...orm.QueryOption) (int64, error)
 	Get(context.Context, *Device, ...orm.QueryOption) error
 	Add(context.Context, *Device) error
-	Edit(context.Context, *Device, func(*Device), ...orm.QueryOption) error
+	Edit(context.Context, *Device, func(*Device) error, ...orm.QueryOption) error
 	Del(context.Context, *Device, ...orm.QueryOption) error
 
 	Session(ctx context.Context, changeFns ...func(*gorm.DB) error) error
@@ -141,12 +141,29 @@ func (c Core) AddDevice(ctx context.Context, in *AddDeviceInput) (*Device, error
 // EditDevice Update object information
 func (c Core) EditDevice(ctx context.Context, in *EditDeviceInput, id string) (*Device, error) {
 	var out Device
-	if err := c.store.Device().Edit(ctx, &out, func(b *Device) {
+	if err := c.store.Device().Edit(ctx, &out, func(b *Device) error {
 		if err := copier.Copy(b, in); err != nil {
 			slog.ErrorContext(ctx, "Copy", "err", err)
 		}
+
+		protocol, ok := c.protocols[out.GetType()]
+		if ok {
+			if err := protocol.ValidateDevice(ctx, &out); err != nil {
+				slog.WarnContext(ctx, "验证协议失败", "err", err, "device_id", out.ID)
+				return err
+			}
+		}
+
+		return nil
 	}, orm.Where("id=?", id)); err != nil {
 		return nil, reason.ErrDB.Withf(`Edit err[%s] id[%s]`, err.Error(), id)
+	}
+
+	protocol, ok := c.protocols[out.GetType()]
+	if ok {
+		if err := protocol.InitDevice(ctx, &out); err != nil {
+			slog.WarnContext(ctx, "初始化协议失败", "err", err, "device_id", out.ID)
+		}
 	}
 	return &out, nil
 }

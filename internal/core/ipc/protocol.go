@@ -59,8 +59,9 @@ func (g Adapter) GetDeviceByDeviceID(gbDeviceID string) (*Device, error) {
 
 func (g Adapter) Logout(deviceID string, changeFn func(*Device)) error {
 	var d Device
-	if err := g.store.Device().Edit(context.TODO(), &d, func(d *Device) {
+	if err := g.store.Device().Edit(context.TODO(), &d, func(d *Device) error {
 		changeFn(d)
+		return nil
 	}, orm.Where("device_id=?", deviceID)); err != nil {
 		return err
 	}
@@ -70,8 +71,9 @@ func (g Adapter) Logout(deviceID string, changeFn func(*Device)) error {
 
 func (g Adapter) Edit(deviceID string, changeFn func(*Device)) error {
 	var d Device
-	if err := g.store.Device().Edit(context.TODO(), &d, func(d *Device) {
+	if err := g.store.Device().Edit(context.TODO(), &d, func(d *Device) error {
 		changeFn(d)
+		return nil
 	}, orm.Where("device_id=?", deviceID)); err != nil {
 		return err
 	}
@@ -106,8 +108,9 @@ func (g Adapter) SaveChannels(channels []*Channel) error {
 
 	// 1. 获取设备信息
 	var dev Device
-	_ = g.store.Device().Edit(context.TODO(), &dev, func(d *Device) {
+	_ = g.store.Device().Edit(context.TODO(), &dev, func(d *Device) error {
 		d.Channels = len(channels)
+		return nil
 	}, orm.Where("device_id=?", channels[0].DeviceID))
 
 	// 2. 批量查询该设备的所有现有通道（一次查询，避免循环查询）
@@ -163,8 +166,9 @@ func (g Adapter) SaveChannels(channels []*Channel) error {
 	// )
 
 	// 7. 更新设备的通道数量
-	_ = g.store.Device().Edit(ctx, &dev, func(d *Device) {
+	_ = g.store.Device().Edit(ctx, &dev, func(d *Device) error {
 		d.Channels = len(channels)
+		return nil
 	}, orm.Where("device_id=?", deviceID))
 
 	return nil

@@ -57,8 +57,9 @@ func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
 	for _, d := range devices {
 		if strings.ToLower(d.Transport) == "tcp" {
 			// 通知相关设备/通道离线
-			c.Change(d.GetGB28181DeviceID(), func(d *ipc.Device) {
+			c.Change(d.GetGB28181DeviceID(), func(d *ipc.Device) error {
 				d.IsOnline = false
+				return nil
 			}, func(d *gbs.Device) {
 				d.IsOnline = false
 			})
@@ -90,7 +91,7 @@ func (c *Cache) RangeDevices(fn func(key string, value *gbs.Device) bool) {
 }
 
 // Change implements gbs.MemoryStorer.
-func (c *Cache) Change(deviceID string, changeFn func(*ipc.Device), changeFn2 func(*gbs.Device)) error {
+func (c *Cache) Change(deviceID string, changeFn func(*ipc.Device) error, changeFn2 func(*gbs.Device)) error {
 	var dev ipc.Device
 	if err := c.Storer.Device().Edit(context.TODO(), &dev, changeFn, orm.Where("device_id=?", deviceID)); err != nil {
 		return err

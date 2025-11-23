@@ -167,15 +167,16 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	expire := ctx.GetHeader("Expires")
 	if expire == "0" {
 		ctx.Log.Info("设备注销")
-		g.logout(ctx.DeviceID, func(b *ipc.Device) {
+		g.logout(ctx.DeviceID, func(b *ipc.Device) error {
 			b.IsOnline = false
 			b.Address = ctx.Source.String()
+			return nil
 		})
 		respFn()
 		return
 	}
 
-	g.login(ctx, func(b *ipc.Device) {
+	g.login(ctx, func(b *ipc.Device) error {
 		b.IsOnline = true
 		b.RegisteredAt = orm.Now()
 		b.KeepaliveAt = orm.Now()
@@ -183,6 +184,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		b.Address = ctx.Source.String()
 		b.Transport = ctx.Source.Network()
 		b.Ext.GBVersion = ctx.XGBVer
+		return nil
 	})
 
 	// conn := ctx.Request.GetConnection()
@@ -198,7 +200,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	_ = g.QueryConfigDownloadBasic(dev.GetGB28181DeviceID())
 }
 
-func (g GB28181API) login(ctx *sip.Context, fn func(d *ipc.Device)) {
+func (g GB28181API) login(ctx *sip.Context, fn func(d *ipc.Device) error) {
 	slog.Info("status change 设备上线", "device_id", ctx.DeviceID)
 	g.svr.memoryStorer.Change(ctx.DeviceID, fn, func(d *Device) {
 		d.conn = ctx.Request.GetConnection()
@@ -207,7 +209,7 @@ func (g GB28181API) login(ctx *sip.Context, fn func(d *ipc.Device)) {
 	})
 }
 
-func (g GB28181API) logout(deviceID string, changeFn func(*ipc.Device)) error {
+func (g GB28181API) logout(deviceID string, changeFn func(*ipc.Device) error) error {
 	slog.Info("status change 设备离线", "device_id", deviceID)
 	return g.svr.memoryStorer.Change(deviceID, changeFn, func(d *Device) {
 		d.Expires = 0

@@ -30,6 +30,10 @@ type EditDeviceInput struct {
 	Password   string `json:"password"`    // 注册密码
 	StreamMode int    `json:"stream_mode"` // 数据传输模式
 
+	Username string `json:"username"` // 用户名
+	IP       string `json:"ip"`       // ip
+	Port     int    `json:"port"`     // port
+
 	// IP           string    `json:"ip"`
 	// Port         int       `json:"port"`
 	// IsOnline     bool      `json:"is_online"`
