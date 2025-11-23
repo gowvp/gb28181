@@ -16,7 +16,7 @@ func (a *Adapter) OnStreamChanged(ctx context.Context, stream string) error {
 	if err := a.adapter.Store().Channel().Get(ctx, &ch, orm.Where("id=?", stream)); err != nil {
 		return err
 	}
-	if err := a.adapter.EditPlaying(ctx, ch.DeviceID, ch.ChannelID, false); err != nil {
+	if err := a.adapter.EditPlayingByID(ctx, ch.ID, false); err != nil {
 		slog.ErrorContext(ctx, "编辑播放状态失败", "err", err)
 	}
 	return nil

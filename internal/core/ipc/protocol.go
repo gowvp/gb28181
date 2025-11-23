@@ -81,6 +81,16 @@ func (g Adapter) Edit(deviceID string, changeFn func(*Device)) error {
 	return nil
 }
 
+func (g Adapter) EditPlayingByID(ctx context.Context, id string, playing bool) error {
+	var ch Channel
+	if err := g.store.Channel().Edit(ctx, &ch, func(c *Channel) {
+		c.IsPlaying = playing
+	}, orm.Where("id=?", id)); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (g Adapter) EditPlaying(ctx context.Context, deviceID, channelID string, playing bool) error {
 	var ch Channel
 	if err := g.store.Channel().Edit(ctx, &ch, func(c *Channel) {

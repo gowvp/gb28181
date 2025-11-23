@@ -20,8 +20,8 @@ go wvp 是 Go 语言实现的开源 GB28181 解决方案，基于 GB28181-2022 �
 
 
 
-|![](./docs/phone/login.webp)|![](./docs/phone/desktop.webp)|![](./docs/phone/gb28181.webp)|
-|-|-|-|
+|![](./docs/phone/login.webp)|![](./docs/phone/desktop.webp)|![](./docs/phone/gb28181.webp)|![](./docs/phone/discover.webp)|
+|-|-|-|-|
 
 
 
@@ -256,6 +256,8 @@ services:
   - [x] 音频支持 g711a/g711u/aac
   - [x] 快照
   - [x] 支持跨域
+  - [x] 支持中文和 English
+  - [x] 支持 onvif
   - [ ] 设备云台控制
   - [ ] 录像回放
   - [ ] 报警事件订阅
