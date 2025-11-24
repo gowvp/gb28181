@@ -161,10 +161,11 @@ func (w WebHookAPI) onRTPServerTimeout(c *gin.Context, in *onRTPServerTimeoutInp
 	return newDefaultOutputOK(), nil
 }
 
+// onStreamNotFound 流不存在事件
+// TODO: 重启后立即播放，会出发 "channel not exist" 待处理
 func (w WebHookAPI) onStreamNotFound(c *gin.Context, in *onStreamNotFoundInput) (DefaultOutput, error) {
 	w.log.InfoContext(c.Request.Context(), "webhook onStreamNotFound", "app", in.App, "stream", in.Stream, "schema", in.Schema, "mediaServerID", in.MediaServerID)
-	// 防止重复触发
-	if in.Schema != "rtmp" {
+	if !(in.Schema == "rtmp" || in.Schema == "rtsp") {
 		return newDefaultOutputOK(), nil
 	}
 
