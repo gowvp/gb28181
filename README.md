@@ -117,6 +117,79 @@ GoWVP [在线接口文档](https://apifox.com/apidoc/shared-7b67c918-5f72-4f64-b
 
 ZLM使用文档 [github.com/ZLMediaKit/ZLMediaKit](https://github.com/ZLMediaKit/ZLMediaKit)
 
+### 新增 API 接口
+
+#### 实时通知 (SSE)
+- `GET /notifications/subscribe` - 订阅实时消息通知(SSE)
+
+#### 录像管理
+- `POST /records/start` - 开始录像
+- `POST /records/stop` - 停止录像
+- `GET /records/status` - 获取录像状态
+- `GET /records/files` - 获取录像文件列表
+
+#### 云台控制 (PTZ)
+- `POST /ptz/control` - 云台方向控制 (上下左右、变倍、光圈、聚焦等)
+- `POST /ptz/preset` - 预置位控制 (设置、调用、删除)
+
+#### 录像回放
+- `POST /playback/start` - 开始录像回放
+- `POST /playback/stop` - 停止录像回放
+- `POST /playback/control` - 回放控制 (暂停、继续、倍速)
+- `GET /playback/records` - 查询设备端录像信息
+
+#### 报警事件
+- `POST /alarms/subscribe` - 订阅设备报警事件
+- `POST /alarms/unsubscribe` - 取消报警订阅
+
+#### AI 智能检测 (YOLO)
+- `POST /ai/detect` - 执行 AI 检测 (行人/车辆/人脸等)
+- `GET /ai/rules` - 获取告警规则列表
+- `POST /ai/rules` - 创建告警规则
+- `GET /ai/rules/:id` - 获取告警规则详情
+- `PUT /ai/rules/:id` - 更新告警规则
+- `DELETE /ai/rules/:id` - 删除告警规则
+- `GET /ai/status` - 获取 AI 服务状态
+
+#### 配置管理
+- `GET /configs/info` - 获取配置信息(包含播放链接过期时间、毛玻璃效果开关)
+- `PUT /configs/info/server` - 修改服务器设置(播放链接过期时间、毛玻璃效果)
+- `PUT /user/user` - 修改账号密码
+
+### 配置说明
+
+在 `configs/config.toml` 中新增以下配置项:
+
+```toml
+[Server]
+  # 播放链接有效期(分钟)，0 表示不限制
+  PlayExpireMinutes = 10
+  # 是否启用快照毛玻璃效果
+  EnableSnapshotBlur = false
+
+# Go 流媒体服务 (可选，替代 ZLMediaKit)
+[GoLive]
+  enabled = false
+  rtmp_port = 1936
+  rtsp_port = 8555
+  http_flv_port = 8088
+  hls_port = 8088
+  public_ip = ""
+  enable_auth = false
+  auth_secret = ""
+
+# AI 检测服务 (YOLO) - 支持本地推理和远程 API
+[AI]
+  enabled = false
+  inference_mode = "remote"  # local(本地推理,适合无网络环境) / remote(远程API)
+  endpoint = "http://localhost:8080"  # 远程 AI 服务地址
+  api_key = ""
+  timeout = 30
+  model_type = "yolov8"
+  model_path = "./models/yolov8n.onnx"  # 本地模型路径
+  device_type = "cpu"  # 推理设备: cpu/cuda/mps
+```
+
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 <h1>看到这里啦，恭喜你发现新项目</h1>
 <h1>点个 star 不迷路</h1>
@@ -241,6 +314,20 @@ services:
 - [x] 支持 SQLite 数据库快速部署
 - [x] 支持 PostgreSQL/MySQL 数据库
 - [x] 服务重启自动离线/自动尝试连接
+- [x] 实时消息通知 (SSE)
+  - [x] 支持设备上线/离线通知
+  - [x] 支持流开始/停止通知
+  - [x] 支持录像状态通知
+- [x] 播放鉴权
+  - [x] 支持播放链接时效控制，可配置过期时间(分钟)
+  - [x] 过期链接自动失效
+- [x] 支持在网页上修改账号和密码
+- [x] 通道封面快照配置
+  - [x] 支持毛玻璃效果开关配置
+- [x] 录像
+  - [x] 开始/停止录像
+  - [x] 获取录像状态
+  - [x] 获取录像文件列表
 - [x] GB/T 28181
   - [x] 设备注册，支持 7 种接入方式
   - [x] 支持 UDP 和 TCP 两种国标信令传输模式
@@ -258,10 +345,21 @@ services:
   - [x] 支持跨域
   - [x] 支持中文和 English
   - [x] 支持 onvif
-  - [ ] 设备云台控制
-  - [ ] 录像回放
-  - [ ] 报警事件订阅
-  - [ ] 报警事件通知处理
+  - [x] 设备云台控制 (方向控制、变倍、光圈、聚焦、预置位)
+  - [x] 录像回放 (开始/停止/暂停/倍速)
+  - [x] 报警事件订阅
+  - [x] 报警事件通知处理
+- [x] Go 流媒体服务 (可选)
+  - [x] 纯 Go 实现的流媒体服务器框架
+  - [x] 支持 RTMP/RTSP/HTTP-FLV/HLS 协议
+  - [x] 可替代 ZLMediaKit 使用
+- [x] AI 智能检测 (YOLO)
+  - [x] 行人入侵检测
+  - [x] 车辆/人脸等多类型检测
+  - [x] 告警规则配置 (阈值、冷却时间、检测区域)
+  - [x] AI 告警实时通知 (SSE)
+  - [x] 支持本地推理 (适合无网络环境)
+  - [x] 支持对接外部 AI 服务 (HTTP API)
 
 
 ## 感谢

@@ -300,3 +300,43 @@ func (n *NodeManager) GetSnapshot(server *MediaServer, in zlm.GetSnapRequest) ([
 	})
 	return e.GetSnap(in)
 }
+
+// StartRecord 开始录像
+func (n *NodeManager) StartRecord(server *MediaServer, in zlm.StartRecordRequest) (*zlm.StartRecordResponse, error) {
+	addr := fmt.Sprintf("http://%s:%d", server.IP, server.Ports.HTTP)
+	e := n.zlm.SetConfig(zlm.Config{
+		URL:    addr,
+		Secret: server.Secret,
+	})
+	return e.StartRecord(in)
+}
+
+// StopRecord 停止录像
+func (n *NodeManager) StopRecord(server *MediaServer, in zlm.StopRecordRequest) (*zlm.StopRecordResponse, error) {
+	addr := fmt.Sprintf("http://%s:%d", server.IP, server.Ports.HTTP)
+	e := n.zlm.SetConfig(zlm.Config{
+		URL:    addr,
+		Secret: server.Secret,
+	})
+	return e.StopRecord(in)
+}
+
+// IsRecording 获取流录像状态
+func (n *NodeManager) IsRecording(server *MediaServer, in zlm.IsRecordingRequest) (*zlm.IsRecordingResponse, error) {
+	addr := fmt.Sprintf("http://%s:%d", server.IP, server.Ports.HTTP)
+	e := n.zlm.SetConfig(zlm.Config{
+		URL:    addr,
+		Secret: server.Secret,
+	})
+	return e.IsRecording(in)
+}
+
+// GetMp4RecordFile 获取录像文件列表
+func (n *NodeManager) GetMp4RecordFile(server *MediaServer, in zlm.GetMp4RecordFileRequest) (*zlm.GetMp4RecordFileResponse, error) {
+	addr := fmt.Sprintf("http://%s:%d", server.IP, server.Ports.HTTP)
+	e := n.zlm.SetConfig(zlm.Config{
+		URL:    addr,
+		Secret: server.Secret,
+	})
+	return e.GetMp4RecordFile(in)
+}

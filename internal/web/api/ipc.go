@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +33,44 @@ var ErrDevice = reason.NewError("ErrDevice", "设备错误")
 const (
 	coverDir = "cover"
 )
+
+// generatePlayToken 生成带时效的播放令牌
+// 格式: timestamp.sign, 其中 sign = MD5(timestamp + secret)
+func generatePlayToken(secret string, expiresAt int64) string {
+	if expiresAt == 0 {
+		return ""
+	}
+	ts := fmt.Sprintf("%d", expiresAt)
+	sign := hook.MD5(ts + secret)
+	return ts + "." + sign
+}
+
+// validatePlayToken 验证播放令牌
+// 返回 true 表示令牌有效或未提供令牌(由调用方决定是否要求令牌)
+// 注意: 调用方应在需要鉴权时先检查令牌是否为空
+func validatePlayToken(token, secret string) bool {
+	if token == "" {
+		return true // 没有 token 时不限制，由调用方检查是否需要令牌
+	}
+	parts := strings.Split(token, ".")
+	if len(parts) != 2 {
+		return false
+	}
+	ts := parts[0]
+	sign := parts[1]
+
+	// 验证签名
+	if hook.MD5(ts+secret) != sign {
+		return false
+	}
+
+	// 验证时间
+	expiresAt, err := strconv.ParseInt(ts, 10, 64)
+	if err != nil {
+		return false
+	}
+	return time.Now().Unix() < expiresAt
+}
 
 // TODO: 快照不会删除，只会覆盖，设备删除时也不会删除快照，待实现
 func writeCover(dataDir, channelID string, body []byte) error {
@@ -260,21 +299,39 @@ func (a IPCAPI) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 	}
 	httpPort := a.uc.Conf.Server.HTTP.Port
 
+	// 生成播放令牌(带时效)
+	var expiresAt int64
+	var playToken string
+	if expireMin := a.uc.Conf.Server.PlayExpireMinutes; expireMin > 0 {
+		expiresAt = time.Now().Add(time.Duration(expireMin) * time.Minute).Unix()
+		playToken = generatePlayToken(a.uc.Conf.Server.HTTP.JwtSecret, expiresAt)
+	}
+
+	// 组装查询参数
+	queryParams := session
+	if playToken != "" {
+		if queryParams != "" {
+			queryParams += "&"
+		}
+		queryParams += "play_token=" + playToken
+	}
+
 	// 播放规则
 	// https://github.com/zlmediakit/ZLMediaKit/wiki/%E6%92%AD%E6%94%BEurl%E8%A7%84%E5%88%99
 
 	out := playOutput{
-		App:    app,
-		Stream: appStream,
+		App:       app,
+		Stream:    appStream,
+		ExpiresAt: expiresAt,
 		Items: []streamAddrItem{
 			{
 				Label:   "默认线路",
-				WSFLV:   fmt.Sprintf("ws://%s:%d/proxy/sms/%s.live.flv", host, httpPort, stream) + "?" + session,
-				HTTPFLV: fmt.Sprintf("http://%s:%d/proxy/sms/%s.live.flv", host, httpPort, stream) + "?" + session,
-				RTMP:    fmt.Sprintf("rtmp://%s:%d/%s", host, svr.Ports.RTMP, stream) + "?" + session,
-				RTSP:    fmt.Sprintf("rtsp://%s:%d/%s", host, svr.Ports.RTSP, stream) + "?" + session,
-				WebRTC:  fmt.Sprintf("webrtc://%s:%d/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", host, httpPort, app, stream) + "&" + session,
-				HLS:     fmt.Sprintf("http://%s:%d/proxy/sms/%s/hls.fmp4.m3u8", host, httpPort, stream) + "?" + session,
+				WSFLV:   fmt.Sprintf("ws://%s:%d/proxy/sms/%s.live.flv", host, httpPort, stream) + "?" + queryParams,
+				HTTPFLV: fmt.Sprintf("http://%s:%d/proxy/sms/%s.live.flv", host, httpPort, stream) + "?" + queryParams,
+				RTMP:    fmt.Sprintf("rtmp://%s:%d/%s", host, svr.Ports.RTMP, stream) + "?" + queryParams,
+				RTSP:    fmt.Sprintf("rtsp://%s:%d/%s", host, svr.Ports.RTSP, stream) + "?" + queryParams,
+				WebRTC:  fmt.Sprintf("webrtc://%s:%d/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", host, httpPort, app, stream) + "&" + queryParams,
+				HLS:     fmt.Sprintf("http://%s:%d/proxy/sms/%s/hls.fmp4.m3u8", host, httpPort, stream) + "?" + queryParams,
 			},
 			// {
 			// 	Label:   "SSL 线路",
@@ -291,16 +348,16 @@ func (a IPCAPI) play(c *gin.Context, _ *struct{}) (*playOutput, error) {
 	prefix := c.Request.Header.Get("X-Forwarded-Prefix")
 	if prefix != "" {
 		wsPrefix := strings.Replace(strings.Replace(prefix, "https", "wss", 1), "http", "ws", 1)
-		out.Items[0].WSFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", wsPrefix, stream) + "?" + session
-		out.Items[0].HTTPFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", prefix, stream) + "?" + session
-		out.Items[0].HLS = fmt.Sprintf("%s/proxy/sms/%s/hls.fmp4.m3u8", prefix, stream) + "?" + session
+		out.Items[0].WSFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", wsPrefix, stream) + "?" + queryParams
+		out.Items[0].HTTPFLV = fmt.Sprintf("%s/proxy/sms/%s.live.flv", prefix, stream) + "?" + queryParams
+		out.Items[0].HLS = fmt.Sprintf("%s/proxy/sms/%s/hls.fmp4.m3u8", prefix, stream) + "?" + queryParams
 		rtcPrefix := strings.Replace(strings.Replace(prefix, "https", "webrtc", 1), "http", "webrtc", 1)
-		out.Items[0].WebRTC = fmt.Sprintf("%s/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", rtcPrefix, app, stream) + "&" + session
+		out.Items[0].WebRTC = fmt.Sprintf("%s/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", rtcPrefix, app, stream) + "&" + queryParams
 
 		host := c.Request.Header.Get("X-Forwarded-Host")
 		if host != "" {
-			out.Items[0].RTMP = fmt.Sprintf("rtmp://%s:%d/%s", host, svr.Ports.RTMP, stream) + "?" + session
-			out.Items[0].RTSP = fmt.Sprintf("rtsp://%s:%d/%s", host, svr.Ports.RTSP, stream) + "?" + session
+			out.Items[0].RTMP = fmt.Sprintf("rtmp://%s:%d/%s", host, svr.Ports.RTMP, stream) + "?" + queryParams
+			out.Items[0].RTSP = fmt.Sprintf("rtsp://%s:%d/%s", host, svr.Ports.RTSP, stream) + "?" + queryParams
 		}
 	}
 
