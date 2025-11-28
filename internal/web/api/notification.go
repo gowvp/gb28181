@@ -78,19 +78,20 @@ func (h *NotificationHub) RemoveClient(id string) {
 // Broadcast 广播通知到所有客户端
 func (h *NotificationHub) Broadcast(notification Notification) {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
-
 	notification.ID = uuid.NewString()
 	notification.Timestamp = time.Now().Unix()
 
 	data, err := json.Marshal(notification)
 	if err != nil {
+		h.mu.RUnlock()
 		slog.Error("marshal notification failed", "err", err)
 		return
 	}
 
+	var nilClients []string
 	for id, client := range h.clients {
 		if client == nil {
+			nilClients = append(nilClients, id)
 			continue
 		}
 		client.Publish(web.Event{
@@ -99,6 +100,16 @@ func (h *NotificationHub) Broadcast(notification Notification) {
 			Data:  data,
 		})
 		slog.Debug("notification sent", "client_id", id, "type", notification.Type)
+	}
+	h.mu.RUnlock()
+
+	// 清理 nil 客户端
+	if len(nilClients) > 0 {
+		h.mu.Lock()
+		for _, id := range nilClients {
+			delete(h.clients, id)
+		}
+		h.mu.Unlock()
 	}
 }
 

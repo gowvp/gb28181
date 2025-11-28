@@ -46,10 +46,11 @@ func generatePlayToken(secret string, expiresAt int64) string {
 }
 
 // validatePlayToken 验证播放令牌
-// 返回 true 表示有效
+// 返回 true 表示令牌有效或未提供令牌(由调用方决定是否要求令牌)
+// 注意: 调用方应在需要鉴权时先检查令牌是否为空
 func validatePlayToken(token, secret string) bool {
 	if token == "" {
-		return true // 没有 token 时不限制
+		return true // 没有 token 时不限制，由调用方检查是否需要令牌
 	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 2 {
