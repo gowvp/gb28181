@@ -117,6 +117,34 @@ GoWVP [在线接口文档](https://apifox.com/apidoc/shared-7b67c918-5f72-4f64-b
 
 ZLM使用文档 [github.com/ZLMediaKit/ZLMediaKit](https://github.com/ZLMediaKit/ZLMediaKit)
 
+### 新增 API 接口
+
+#### 实时通知 (SSE)
+- `GET /notifications/subscribe` - 订阅实时消息通知(SSE)
+
+#### 录像管理
+- `POST /records/start` - 开始录像
+- `POST /records/stop` - 停止录像
+- `GET /records/status` - 获取录像状态
+- `GET /records/files` - 获取录像文件列表
+
+#### 配置管理
+- `GET /configs/info` - 获取配置信息(包含播放链接过期时间、毛玻璃效果开关)
+- `PUT /configs/info/server` - 修改服务器设置(播放链接过期时间、毛玻璃效果)
+- `PUT /user/user` - 修改账号密码
+
+### 配置说明
+
+在 `configs/config.toml` 中新增以下配置项:
+
+```toml
+[Server]
+  # 播放链接有效期(分钟)，0 表示不限制
+  PlayExpireMinutes = 10
+  # 是否启用快照毛玻璃效果
+  EnableSnapshotBlur = false
+```
+
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 <h1>看到这里啦，恭喜你发现新项目</h1>
 <h1>点个 star 不迷路</h1>
@@ -241,6 +269,20 @@ services:
 - [x] 支持 SQLite 数据库快速部署
 - [x] 支持 PostgreSQL/MySQL 数据库
 - [x] 服务重启自动离线/自动尝试连接
+- [x] 实时消息通知 (SSE)
+  - [x] 支持设备上线/离线通知
+  - [x] 支持流开始/停止通知
+  - [x] 支持录像状态通知
+- [x] 播放鉴权
+  - [x] 支持播放链接时效控制，可配置过期时间(分钟)
+  - [x] 过期链接自动失效
+- [x] 支持在网页上修改账号和密码
+- [x] 通道封面快照配置
+  - [x] 支持毛玻璃效果开关配置
+- [x] 录像
+  - [x] 开始/停止录像
+  - [x] 获取录像状态
+  - [x] 获取录像文件列表
 - [x] GB/T 28181
   - [x] 设备注册，支持 7 种接入方式
   - [x] 支持 UDP 和 TCP 两种国标信令传输模式

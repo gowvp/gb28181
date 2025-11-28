@@ -88,6 +88,10 @@ func (w WebHookAPI) onPublish(c *gin.Context, in *onPublishInput) (*onPublishOut
 // https://docs.zlmediakit.com/zh/guide/media_server/web_hook_api.html#_12%E3%80%81on-stream-changed
 func (w WebHookAPI) onStreamChanged(c *gin.Context, in *onStreamChangedInput) (DefaultOutput, error) {
 	w.log.InfoContext(c.Request.Context(), "webhook onStreamChanged", "app", in.App, "stream", in.Stream, "schema", in.Schema, "mediaServerID", in.MediaServerID, "regist", in.Regist)
+
+	// 发送实时通知
+	NotifyStreamStatus(in.App, in.Stream, in.Regist)
+
 	if in.Regist || in.Schema != "rtmp" {
 		return newDefaultOutputOK(), nil
 	}
@@ -115,15 +119,29 @@ func (w WebHookAPI) onStreamChanged(c *gin.Context, in *onStreamChangedInput) (D
 // 播放rtsp流时，如果该流开启了rtsp专用认证（on_rtsp_realm），则不会触发on_play事件。
 // https://docs.zlmediakit.com/guide/media_server/web_hook_api.html#_6-on-play
 func (w WebHookAPI) onPlay(c *gin.Context, in *onPublishInput) (DefaultOutput, error) {
-	return newDefaultOutputOK(), nil
+	// 解析参数
+	params, err := url.ParseQuery(in.Params)
+	if err != nil {
+		w.log.InfoContext(c.Request.Context(), "webhook onPlay", "err", err)
+		return DefaultOutput{Code: 1, Msg: err.Error()}, nil
+	}
 
+	// 验证播放令牌(如果配置了过期时间)
+	if expireMin := w.conf.Server.PlayExpireMinutes; expireMin > 0 {
+		playToken := params.Get("play_token")
+		if playToken == "" {
+			w.log.InfoContext(c.Request.Context(), "webhook onPlay", "err", "play_token is required")
+			return DefaultOutput{Code: 1, Msg: "播放令牌缺失"}, nil
+		}
+		if !validatePlayToken(playToken, w.conf.Server.HTTP.JwtSecret) {
+			w.log.InfoContext(c.Request.Context(), "webhook onPlay", "err", "invalid or expired play_token")
+			return DefaultOutput{Code: 1, Msg: "播放令牌无效或已过期"}, nil
+		}
+	}
+
+	// RTMP 流的 session 验证
 	switch in.Schema {
 	case "rtmp":
-		params, err := url.ParseQuery(in.Params)
-		if err != nil {
-			w.log.InfoContext(c.Request.Context(), "webhook onPlay", "err", err)
-			return DefaultOutput{Code: 1, Msg: err.Error()}, nil
-		}
 		session := params.Get("session")
 		if err := w.mediaCore.OnPlay(c.Request.Context(), push.OnPlayInput{
 			App:     in.App,

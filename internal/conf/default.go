@@ -9,9 +9,11 @@ import (
 func DefaultConfig() Bootstrap {
 	return Bootstrap{
 		Server: Server{
-			Username:   "admin",
-			Password:   "admin",
-			RTMPSecret: "123",
+			Username:           "admin",
+			Password:           "admin",
+			RTMPSecret:         "123",
+			PlayExpireMinutes:  10, // 默认 10 分钟过期
+			EnableSnapshotBlur: false,
 			HTTP: ServerHTTP{
 				Port:      15123,
 				Timeout:   Duration(60 * time.Second),

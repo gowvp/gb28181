@@ -22,6 +22,12 @@ type Server struct {
 	Username string `comment:"登录用户名"`
 	Password string `comment:"登录密码"`
 
+	// 播放链接有效期(分钟)，0 表示不限制
+	PlayExpireMinutes int `comment:"播放链接有效期(分钟)，0 表示不限制"`
+
+	// 是否启用快照毛玻璃效果
+	EnableSnapshotBlur bool `comment:"是否启用快照毛玻璃效果"`
+
 	HTTP ServerHTTP `comment:"对外提供的服务，建议由 nginx 代理"` // HTTP服务器
 }
 

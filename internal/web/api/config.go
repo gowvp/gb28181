@@ -36,6 +36,7 @@ func registerConfig(g gin.IRouter, api ConfigAPI, handler ...gin.HandlerFunc) {
 
 		group.GET("/info", web.WrapH(api.getConfigInfo))
 		group.PUT("/info/sip", web.WrapH(api.editSIP))
+		group.PUT("/info/server", web.WrapH(api.editServerSettings))
 	}
 }
 
@@ -66,18 +67,43 @@ func (a ConfigAPI) delConfig(c *gin.Context, _ *struct{}) (any, error) {
 }
 
 type getConfigInfoOutput struct {
-	SIP conf.SIP `json:"sip"`
+	SIP                conf.SIP `json:"sip"`
+	PlayExpireMinutes  int      `json:"play_expire_minutes"`  // 播放链接有效期(分钟)
+	EnableSnapshotBlur bool     `json:"enable_snapshot_blur"` // 是否启用快照毛玻璃效果
 }
 
 func (a ConfigAPI) getConfigInfo(c *gin.Context, _ *struct{}) (*getConfigInfoOutput, error) {
 	return &getConfigInfoOutput{
-		SIP: a.conf.Sip,
+		SIP:                a.conf.Sip,
+		PlayExpireMinutes:  a.conf.Server.PlayExpireMinutes,
+		EnableSnapshotBlur: a.conf.Server.EnableSnapshotBlur,
 	}, nil
 }
 
 func (a ConfigAPI) editSIP(_ *gin.Context, in *conf.SIP) (gin.H, error) {
 	if err := copier.Copy(&a.conf.Sip, in); err != nil {
 		return nil, reason.ErrServer.SetMsg(err.Error())
+	}
+
+	if err := conf.WriteConfig(a.conf, a.conf.ConfigPath); err != nil {
+		return nil, reason.ErrServer.SetMsg(err.Error())
+	}
+	return gin.H{"msg": "ok"}, nil
+}
+
+// editServerSettingsInput 服务器设置输入
+type editServerSettingsInput struct {
+	PlayExpireMinutes  *int  `json:"play_expire_minutes"`  // 播放链接有效期(分钟)
+	EnableSnapshotBlur *bool `json:"enable_snapshot_blur"` // 是否启用快照毛玻璃效果
+}
+
+// editServerSettings 修改服务器设置
+func (a ConfigAPI) editServerSettings(_ *gin.Context, in *editServerSettingsInput) (gin.H, error) {
+	if in.PlayExpireMinutes != nil {
+		a.conf.Server.PlayExpireMinutes = *in.PlayExpireMinutes
+	}
+	if in.EnableSnapshotBlur != nil {
+		a.conf.Server.EnableSnapshotBlur = *in.EnableSnapshotBlur
 	}
 
 	if err := conf.WriteConfig(a.conf, a.conf.ConfigPath); err != nil {

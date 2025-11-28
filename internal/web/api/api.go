@@ -101,15 +101,18 @@ func setupRouter(r *gin.Engine, uc *Usecase) {
 	registerConfig(r, uc.ConfigAPI, auth)
 	registerSms(r, uc.SMSAPI, auth)
 	RegisterUser(r, uc.UserAPI, auth)
+	registerRecordAPI(r, uc.SMSAPI, auth)       // 录像 API
+	registerNotificationAPI(r, auth)            // 实时通知 API
 
 	// 反向代理流媒体数据
 	r.Any("/proxy/sms/*path", uc.proxySMS)
 }
 
 type playOutput struct {
-	App    string           `json:"app"`
-	Stream string           `json:"stream"`
-	Items  []streamAddrItem `json:"items"`
+	App       string           `json:"app"`
+	Stream    string           `json:"stream"`
+	Items     []streamAddrItem `json:"items"`
+	ExpiresAt int64            `json:"expires_at,omitempty"` // 播放链接过期时间戳(秒)
 }
 type streamAddrItem struct {
 	Label   string `json:"label"`
