@@ -8,11 +8,13 @@ type Bootstrap struct {
 	ConfigDir    string `toml:"-" json:"-"`
 	ConfigPath   string `toml:"-" json:"-"`
 
-	Server Server // 服务器
-	Data   Data   // 数据
-	Log    Log    // 日志
-	Sip    SIP
-	Media  Media // 媒体
+	Server   Server   // 服务器
+	Data     Data     // 数据
+	Log      Log      // 日志
+	Sip      SIP
+	Media    Media    // 媒体
+	GoLive   GoLive   // Go 流媒体服务
+	AI       AI       // AI 检测服务
 }
 
 type Server struct {
@@ -84,6 +86,34 @@ type Media struct {
 	WebHookIP    string `comment:"用于流媒体 webhook 回调"`
 	RTPPortRange string `comment:"媒体服务器 RTP 端口范围"`
 	SDPIP        string `comment:"媒体服务器 SDP IP"`
+}
+
+// GoLive Go 流媒体服务配置
+type GoLive struct {
+	Enabled      bool   `comment:"是否启用 Go 流媒体服务" toml:"enabled"`
+	RTMPPort     int    `comment:"RTMP 端口" toml:"rtmp_port"`
+	RTSPPort     int    `comment:"RTSP 端口" toml:"rtsp_port"`
+	HTTPFLVPort  int    `comment:"HTTP-FLV 端口" toml:"http_flv_port"`
+	HLSPort      int    `comment:"HLS 端口" toml:"hls_port"`
+	PublicIP     string `comment:"公网 IP" toml:"public_ip"`
+	EnableAuth   bool   `comment:"启用推流鉴权" toml:"enable_auth"`
+	AuthSecret   string `comment:"推流鉴权密钥" toml:"auth_secret"`
+	HLSFragment  int    `comment:"HLS 分片时长(秒)" toml:"hls_fragment"`
+	HLSWindow    int    `comment:"HLS 窗口大小" toml:"hls_window"`
+	RecordPath   string `comment:"录像存储路径" toml:"record_path"`
+	EnableRecord bool   `comment:"启用录像" toml:"enable_record"`
+}
+
+// AI AI 检测服务配置
+type AI struct {
+	Enabled       bool   `comment:"是否启用 AI 检测服务" toml:"enabled"`
+	InferenceMode string `comment:"推理模式: local(本地推理) / remote(远程API)" toml:"inference_mode"`
+	Endpoint      string `comment:"远程 AI 服务地址" toml:"endpoint"`
+	APIKey        string `comment:"API 密钥" toml:"api_key"`
+	Timeout       int    `comment:"请求超时(秒)" toml:"timeout"`
+	ModelType     string `comment:"模型类型: yolov5/yolov8/custom" toml:"model_type"`
+	ModelPath     string `comment:"本地模型文件路径" toml:"model_path"`
+	DeviceType    string `comment:"推理设备类型: cpu/cuda/mps" toml:"device_type"`
 }
 
 type Duration time.Duration

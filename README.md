@@ -142,6 +142,15 @@ ZLM使用文档 [github.com/ZLMediaKit/ZLMediaKit](https://github.com/ZLMediaKit
 - `POST /alarms/subscribe` - 订阅设备报警事件
 - `POST /alarms/unsubscribe` - 取消报警订阅
 
+#### AI 智能检测 (YOLO)
+- `POST /ai/detect` - 执行 AI 检测 (行人/车辆/人脸等)
+- `GET /ai/rules` - 获取告警规则列表
+- `POST /ai/rules` - 创建告警规则
+- `GET /ai/rules/:id` - 获取告警规则详情
+- `PUT /ai/rules/:id` - 更新告警规则
+- `DELETE /ai/rules/:id` - 删除告警规则
+- `GET /ai/status` - 获取 AI 服务状态
+
 #### 配置管理
 - `GET /configs/info` - 获取配置信息(包含播放链接过期时间、毛玻璃效果开关)
 - `PUT /configs/info/server` - 修改服务器设置(播放链接过期时间、毛玻璃效果)
@@ -157,6 +166,28 @@ ZLM使用文档 [github.com/ZLMediaKit/ZLMediaKit](https://github.com/ZLMediaKit
   PlayExpireMinutes = 10
   # 是否启用快照毛玻璃效果
   EnableSnapshotBlur = false
+
+# Go 流媒体服务 (可选，替代 ZLMediaKit)
+[GoLive]
+  enabled = false
+  rtmp_port = 1936
+  rtsp_port = 8555
+  http_flv_port = 8088
+  hls_port = 8088
+  public_ip = ""
+  enable_auth = false
+  auth_secret = ""
+
+# AI 检测服务 (YOLO) - 支持本地推理和远程 API
+[AI]
+  enabled = false
+  inference_mode = "remote"  # local(本地推理,适合无网络环境) / remote(远程API)
+  endpoint = "http://localhost:8080"  # 远程 AI 服务地址
+  api_key = ""
+  timeout = 30
+  model_type = "yolov8"
+  model_path = "./models/yolov8n.onnx"  # 本地模型路径
+  device_type = "cpu"  # 推理设备: cpu/cuda/mps
 ```
 
 // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -318,6 +349,17 @@ services:
   - [x] 录像回放 (开始/停止/暂停/倍速)
   - [x] 报警事件订阅
   - [x] 报警事件通知处理
+- [x] Go 流媒体服务 (可选)
+  - [x] 纯 Go 实现的流媒体服务器框架
+  - [x] 支持 RTMP/RTSP/HTTP-FLV/HLS 协议
+  - [x] 可替代 ZLMediaKit 使用
+- [x] AI 智能检测 (YOLO)
+  - [x] 行人入侵检测
+  - [x] 车辆/人脸等多类型检测
+  - [x] 告警规则配置 (阈值、冷却时间、检测区域)
+  - [x] AI 告警实时通知 (SSE)
+  - [x] 支持本地推理 (适合无网络环境)
+  - [x] 支持对接外部 AI 服务 (HTTP API)
 
 
 ## 感谢

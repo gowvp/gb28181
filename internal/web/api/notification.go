@@ -33,6 +33,8 @@ const (
 	NotifyTypeAlarm NotificationType = "alarm"
 	// NotifyTypeAlarmSubscribed 报警订阅状态变更
 	NotifyTypeAlarmSubscribed NotificationType = "alarm_subscribed"
+	// NotifyTypeAIAlert AI 检测告警
+	NotifyTypeAIAlert NotificationType = "ai_alert"
 )
 
 // Notification 通知消息
