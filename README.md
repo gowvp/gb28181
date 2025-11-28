@@ -128,6 +128,20 @@ ZLM使用文档 [github.com/ZLMediaKit/ZLMediaKit](https://github.com/ZLMediaKit
 - `GET /records/status` - 获取录像状态
 - `GET /records/files` - 获取录像文件列表
 
+#### 云台控制 (PTZ)
+- `POST /ptz/control` - 云台方向控制 (上下左右、变倍、光圈、聚焦等)
+- `POST /ptz/preset` - 预置位控制 (设置、调用、删除)
+
+#### 录像回放
+- `POST /playback/start` - 开始录像回放
+- `POST /playback/stop` - 停止录像回放
+- `POST /playback/control` - 回放控制 (暂停、继续、倍速)
+- `GET /playback/records` - 查询设备端录像信息
+
+#### 报警事件
+- `POST /alarms/subscribe` - 订阅设备报警事件
+- `POST /alarms/unsubscribe` - 取消报警订阅
+
 #### 配置管理
 - `GET /configs/info` - 获取配置信息(包含播放链接过期时间、毛玻璃效果开关)
 - `PUT /configs/info/server` - 修改服务器设置(播放链接过期时间、毛玻璃效果)
@@ -300,10 +314,10 @@ services:
   - [x] 支持跨域
   - [x] 支持中文和 English
   - [x] 支持 onvif
-  - [ ] 设备云台控制
-  - [ ] 录像回放
-  - [ ] 报警事件订阅
-  - [ ] 报警事件通知处理
+  - [x] 设备云台控制 (方向控制、变倍、光圈、聚焦、预置位)
+  - [x] 录像回放 (开始/停止/暂停/倍速)
+  - [x] 报警事件订阅
+  - [x] 报警事件通知处理
 
 
 ## 感谢

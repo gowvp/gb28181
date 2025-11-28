@@ -103,6 +103,9 @@ func setupRouter(r *gin.Engine, uc *Usecase) {
 	RegisterUser(r, uc.UserAPI, auth)
 	registerRecordAPI(r, uc.SMSAPI, auth)       // 录像 API
 	registerNotificationAPI(r, auth)            // 实时通知 API
+	registerPTZAPI(r, uc.GB28181API, auth)      // 云台控制 API
+	registerPlaybackAPI(r, uc.GB28181API, auth) // 录像回放 API
+	registerAlarmAPI(r, uc.GB28181API, auth)    // 报警事件 API
 
 	// 反向代理流媒体数据
 	r.Any("/proxy/sms/*path", uc.proxySMS)

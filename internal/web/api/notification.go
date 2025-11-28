@@ -29,6 +29,10 @@ const (
 	NotifyRecordStop NotificationType = "record_stop"
 	// NotifyTypeError 错误通知
 	NotifyTypeError NotificationType = "error"
+	// NotifyTypeAlarm 报警通知
+	NotifyTypeAlarm NotificationType = "alarm"
+	// NotifyTypeAlarmSubscribed 报警订阅状态变更
+	NotifyTypeAlarmSubscribed NotificationType = "alarm_subscribed"
 )
 
 // Notification 通知消息
@@ -183,6 +187,39 @@ func NotifyError(message string, data any) {
 		Type:    NotifyTypeError,
 		Message: message,
 		Data:    data,
+	})
+}
+
+// NotifyAlarmEvent 通知报警事件
+func NotifyAlarmEvent(deviceID, channelID, alarmType, alarmPriority, description string) {
+	hub := GetNotificationHub()
+	hub.Broadcast(Notification{
+		Type:    NotifyTypeAlarm,
+		Message: "收到报警事件",
+		Data: map[string]any{
+			"device_id":      deviceID,
+			"channel_id":     channelID,
+			"alarm_type":     alarmType,
+			"alarm_priority": alarmPriority,
+			"description":    description,
+		},
+	})
+}
+
+// NotifyAlarmSubscriptionChanged 通知报警订阅状态变更
+func NotifyAlarmSubscriptionChanged(deviceID string, subscribed bool) {
+	hub := GetNotificationHub()
+	message := "已取消报警订阅"
+	if subscribed {
+		message = "已订阅报警"
+	}
+	hub.Broadcast(Notification{
+		Type:    NotifyTypeAlarmSubscribed,
+		Message: message,
+		Data: map[string]any{
+			"device_id":  deviceID,
+			"subscribed": subscribed,
+		},
 	})
 }
 
