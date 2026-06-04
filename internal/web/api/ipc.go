@@ -806,7 +806,7 @@ func (a IPCAPI) buildRTSPURL(ctx context.Context, channelID string) (string, err
 // setRecordModeInput 设置录像模式请求参数
 type setRecordModeInput struct {
 	// 录像模式：always-一直录制，ai-按AI触发录制，none-不录制
-	Mode string `json:"mode" binding:"required,oneof=always ai none"`
+	Mode string `json:"mode" binding:"required,oneof=always ai none watchRecord"`
 }
 
 // setRecordMode 设置通道的录像模式，支持三种模式：always(一直录制)、ai(AI触发录制)、none(不录制)
