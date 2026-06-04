@@ -244,6 +244,10 @@ func (w WebHookAPI) onStreamNoneReader(c *gin.Context, in *onStreamNoneReaderInp
 
 	// 如果录像模式为 none，则关闭流；否则保持流不关闭以继续录制
 	shouldClose := ch.Ext.IsNoneRecord()
+	// 播放即录制
+	if !shouldClose && ch.Ext.IsWatchRecordRecord() {
+		shouldClose = true
+	}
 	w.log.InfoContext(ctx, "无人观看判断", "stream", in.Stream, "record_mode", ch.Ext.GetRecordMode(), "close", shouldClose)
 	if shouldClose {
 		// 更新通道的播放状态为未播放（所有协议统一处理）

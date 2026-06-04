@@ -61,6 +61,11 @@ func (e *DeviceExt) IsAIRecord() bool {
 	return e.RecordMode == "ai"
 }
 
+// IsWatchRecordRecord 播放即录制
+func (e *DeviceExt) IsWatchRecordRecord() bool {
+	return e.RecordMode == "watchRecord"
+}
+
 func (e *DeviceExt) IsNoneRecord() bool {
 	return e.RecordMode == "none" || e.RecordMode == ""
 }
