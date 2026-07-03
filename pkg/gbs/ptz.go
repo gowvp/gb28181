@@ -144,13 +144,13 @@ func BuildContinuousMove(direction string, speed float64) string {
 	case "zoomin":
 		builder.direction = PTZ_BIT_ZOOM_IN
 		builder.zoomSpeed = speedByte >> 4 // 高4位
-		builder.horzSpeed = speedByte      // 也设置其他速度
-		builder.vertSpeed = speedByte
+		builder.horzSpeed = 0x00       
+		builder.vertSpeed = 0x00 
 	case "zoomout":
 		builder.direction = PTZ_BIT_ZOOM_OUT
 		builder.zoomSpeed = speedByte >> 4 // 高4位
-		builder.horzSpeed = speedByte      // 也设置其他速度
-		builder.vertSpeed = speedByte
+		builder.horzSpeed = 0x00       
+		builder.vertSpeed = 0x00 
 	default:
 		return ""
 	}
