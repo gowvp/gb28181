@@ -19,6 +19,26 @@ type (
 	TestMediaServerStorer struct{}
 )
 
+// Create implements [MediaServerStorer].
+func (t *TestMediaServerStorer) Create(context.Context, *MediaServer) error {
+	panic("unimplemented")
+}
+
+// Delete implements [MediaServerStorer].
+func (t *TestMediaServerStorer) Delete(context.Context, *MediaServer, ...orm.QueryOption) error {
+	panic("unimplemented")
+}
+
+// List implements [MediaServerStorer].
+func (t *TestMediaServerStorer) List(context.Context, *[]*MediaServer, orm.Pager, ...orm.QueryOption) (int64, error) {
+	panic("unimplemented")
+}
+
+// Update implements [MediaServerStorer].
+func (t *TestMediaServerStorer) Update(context.Context, *MediaServer, func(*MediaServer), ...orm.QueryOption) error {
+	panic("unimplemented")
+}
+
 // Add implements MediaServerStorer.
 func (t *TestMediaServerStorer) Add(context.Context, *MediaServer) error {
 	panic("unimplemented")

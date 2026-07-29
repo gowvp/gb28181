@@ -75,7 +75,7 @@ func (c Core) CreateStreamPush(ctx context.Context, in *AddStreamPushInput) (*St
 	out.ID = c.uniqueID.UniqueID(bz.IDPrefixRTMP)
 	if err := c.store.StreamPush().Create(ctx, &out); err != nil {
 		if orm.IsDuplicatedKey(err) {
-			return nil, reason.ErrDB.SetMsg("stream 重复，请勿重复添加")
+			return nil, reason.ErrDB.WithMsg("stream 重复，请勿重复添加")
 		}
 		return nil, reason.ErrDB.Withf(`Create err[%s]`, err.Error())
 	}

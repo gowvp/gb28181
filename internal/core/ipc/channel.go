@@ -96,17 +96,17 @@ func (c Core) GetChannel(ctx context.Context, id string) (*Channel, error) {
 func (c Core) CreateChannel(ctx context.Context, in *AddChannelInput) (*Channel, error) {
 	// 仅支持 RTMP/RTSP 类型
 	if in.Type != TypeRTMP && in.Type != TypeRTSP {
-		return nil, reason.ErrBadRequest.SetMsg("仅支持 RTMP/RTSP 类型通道")
+		return nil, reason.ErrBadRequest.WithMsg("仅支持 RTMP/RTSP 类型通道")
 	}
 
 	// 验证必填字段
 	if in.Name == "" {
-		return nil, reason.ErrBadRequest.SetMsg("通道名称不能为空")
+		return nil, reason.ErrBadRequest.WithMsg("通道名称不能为空")
 	}
 
 	// 禁止 app=rtp，rtp 专用于 GB28181 协议
 	if strings.EqualFold(in.App, "rtp") {
-		return nil, reason.ErrBadRequest.SetMsg("app=rtp 为 GB28181 专用，RTMP/RTSP 不可使用")
+		return nil, reason.ErrBadRequest.WithMsg("app=rtp 为 GB28181 专用，RTMP/RTSP 不可使用")
 	}
 
 	var deviceID string
@@ -119,7 +119,7 @@ func (c Core) CreateChannel(ctx context.Context, in *AddChannelInput) (*Channel,
 		var dev Device
 		if err := c.store.Device().Get(ctx, &dev, orm.Where("id=?", in.DeviceID)); err != nil {
 			if orm.IsErrRecordNotFound(err) {
-				return nil, reason.ErrNotFound.SetMsg("设备不存在")
+				return nil, reason.ErrNotFound.WithMsg("设备不存在")
 			}
 			return nil, reason.ErrDB.Withf(`Get device err[%s]`, err.Error())
 		}
@@ -142,7 +142,7 @@ func (c Core) CreateChannel(ctx context.Context, in *AddChannelInput) (*Channel,
 		deviceID = newDev.ID
 	} else {
 		// 既没有 device_id 也没有 device_name
-		return nil, reason.ErrBadRequest.SetMsg("device_id 或 device_name 必须提供其一")
+		return nil, reason.ErrBadRequest.WithMsg("device_id 或 device_name 必须提供其一")
 	}
 
 	// 创建通道
@@ -172,7 +172,7 @@ func (c Core) CreateChannel(ctx context.Context, in *AddChannelInput) (*Channel,
 
 	if err := c.store.Channel().Create(ctx, &out); err != nil {
 		if orm.IsDuplicatedKey(err) {
-			return nil, reason.ErrDB.SetMsg("通道已存在")
+			return nil, reason.ErrDB.WithMsg("通道已存在")
 		}
 		return nil, reason.ErrDB.Withf(`Create err[%s]`, err.Error())
 	}
@@ -207,7 +207,7 @@ func getDevicePrefix(t string) string {
 // 仅覆盖前端实际传入的非零值字段，避免 copier 零值覆盖导致数据丢失
 func (c Core) UpdateChannel(ctx context.Context, in *EditChannelInput, id string) (*Channel, error) {
 	if strings.EqualFold(in.App, "rtp") {
-		return nil, reason.ErrBadRequest.SetMsg("app=rtp 为 GB28181 专用，RTMP/RTSP 不可使用")
+		return nil, reason.ErrBadRequest.WithMsg("app=rtp 为 GB28181 专用，RTMP/RTSP 不可使用")
 	}
 
 	var out Channel
@@ -294,7 +294,7 @@ func (c Core) AddZone(ctx context.Context, in *AddZoneInput, channelID string) (
 		if slices.ContainsFunc(b.Ext.Zones, func(z Zone) bool {
 			return z.Name == in.Name
 		}) {
-			return reason.ErrBadRequest.SetMsg("存在同名区域")
+			return reason.ErrBadRequest.WithMsg("存在同名区域")
 		}
 
 		b.Ext.Zones = append(b.Ext.Zones, newZone)
@@ -316,7 +316,7 @@ func (c Core) DeleteZone(ctx context.Context, channelID, zoneName string) ([]Zon
 			return z.Name == zoneName
 		})
 		if idx < 0 {
-			return reason.ErrNotFound.SetMsg("区域不存在")
+			return reason.ErrNotFound.WithMsg("区域不存在")
 		}
 		b.Ext.Zones = slices.Delete(b.Ext.Zones, idx, idx+1)
 		return nil
@@ -531,7 +531,7 @@ func (c Core) PTZControl(ctx context.Context, channelID string, cmd PTZCommand) 
 
 	// 检查设备是否在线
 	if !device.IsOnline {
-		return reason.ErrBadRequest.SetMsg("设备离线")
+		return reason.ErrBadRequest.WithMsg("设备离线")
 	}
 
 	// 调试日志：输出设备和通道信息
@@ -558,7 +558,7 @@ func (c Core) PTZControl(ctx context.Context, channelID string, cmd PTZCommand) 
 	// 获取协议适配器
 	protocol, ok := c.protocols[protocolType]
 	if !ok {
-		return reason.ErrBadRequest.SetMsg(fmt.Sprintf("不支持的协议类型: %s (可用协议: %v)", protocolType, c.getProtocolKeys()))
+		return reason.ErrBadRequest.WithMsg(fmt.Sprintf("不支持的协议类型: %s (可用协议: %v)", protocolType, c.getProtocolKeys()))
 	}
 
 	// 调用协议的 PTZ 控制方法

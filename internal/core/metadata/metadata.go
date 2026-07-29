@@ -56,7 +56,7 @@ func (c Core) CreateMetadata(ctx context.Context, in *AddMetadataInput) (*Metada
 
 	if err := c.store.Metadata().Create(ctx, &out); err != nil {
 		if orm.IsDuplicatedKey(err) {
-			return nil, reason.ErrBadRequest.SetMsg("数据重复").Withf("key[%s]", in.ID)
+			return nil, reason.ErrBadRequest.WithMsg("数据重复").Withf("key[%s]", in.ID)
 		}
 		return nil, reason.ErrDB.Withf(`Create err[%s]`, err.Error())
 	}
@@ -99,7 +99,7 @@ func (c Core) SaveMetadata(ctx context.Context, in *SaveMetadataInput, id string
 	}
 	if err := c.store.Metadata().Create(ctx, &out); err != nil {
 		if orm.IsDuplicatedKey(err) {
-			return nil, reason.ErrBadRequest.SetMsg("数据重复").Withf("key[%s]", id)
+			return nil, reason.ErrBadRequest.WithMsg("数据重复").Withf("key[%s]", id)
 		}
 		return nil, reason.ErrDB.Withf(`Create err[%s]`, err.Error())
 	}

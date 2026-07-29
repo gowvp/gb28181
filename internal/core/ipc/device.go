@@ -105,7 +105,7 @@ func (c Core) CreateDevice(ctx context.Context, in *AddDeviceInput) (*Device, er
 	// 协议验证（通过接口调用）
 	if protocol, ok := c.protocols[out.GetType()]; ok {
 		if err := protocol.ValidateDevice(ctx, &out); err != nil {
-			return nil, reason.ErrBadRequest.SetMsg(err.Error())
+			return nil, reason.ErrBadRequest.WithMsg(err.Error())
 		}
 	}
 
@@ -117,13 +117,13 @@ func (c Core) CreateDevice(ctx context.Context, in *AddDeviceInput) (*Device, er
 	}
 
 	if err := out.Check(); err != nil {
-		return nil, reason.ErrBadRequest.SetMsg(err.Error())
+		return nil, reason.ErrBadRequest.WithMsg(err.Error())
 	}
 
 	// 持久化到数据库
 	if err := c.store.Device().Create(ctx, &out); err != nil {
 		if orm.IsDuplicatedKey(err) {
-			return nil, reason.ErrDB.SetMsg("国标 ID 重复，请勿重复添加")
+			return nil, reason.ErrDB.WithMsg("国标 ID 重复，请勿重复添加")
 		}
 		return nil, reason.ErrDB.Withf(`Create err[%s]`, err.Error())
 	}
@@ -131,7 +131,7 @@ func (c Core) CreateDevice(ctx context.Context, in *AddDeviceInput) (*Device, er
 	// 初始化协议连接（失败不影响设备添加）
 	if protocol, ok := c.protocols[out.GetType()]; ok {
 		if err := protocol.InitDevice(ctx, &out); err != nil {
-			return nil, reason.ErrBadRequest.SetMsg(err.Error())
+			return nil, reason.ErrBadRequest.WithMsg(err.Error())
 		}
 	}
 
@@ -200,7 +200,7 @@ func (c Core) QueryCatalog(ctx context.Context, deviceID string) error {
 		return err
 	}
 	if err := c.protocols[device.GetType()].QueryCatalog(ctx, device); err != nil {
-		return reason.ErrBadRequest.SetMsg(err.Error())
+		return reason.ErrBadRequest.WithMsg(err.Error())
 	}
 	return nil
 }

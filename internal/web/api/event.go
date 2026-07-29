@@ -91,7 +91,7 @@ func (a EventAPI) deleteEvent(c *gin.Context, in *eventIDInput) (*event.Event, e
 func (a EventAPI) getEventImage(c *gin.Context) {
 	imagePath := c.Param("path")
 	if imagePath == "" {
-		web.Fail(c, reason.ErrNotFound.SetMsg("image path is required"))
+		web.Fail(c, reason.ErrNotFound.WithMsg("image path is required"))
 		return
 	}
 
@@ -106,13 +106,13 @@ func (a EventAPI) getEventImage(c *gin.Context) {
 	eventsDir := filepath.Join(system.Getwd(), "configs", "events")
 	absPath, err := filepath.Abs(fullPath)
 	if err != nil || !filepath.HasPrefix(absPath, eventsDir) {
-		web.Fail(c, reason.ErrNotFound.SetMsg("invalid path"))
+		web.Fail(c, reason.ErrNotFound.WithMsg("invalid path"))
 		return
 	}
 
 	body, err := os.ReadFile(fullPath)
 	if err != nil {
-		web.Fail(c, reason.ErrNotFound.SetMsg(err.Error()))
+		web.Fail(c, reason.ErrNotFound.WithMsg(err.Error()))
 		return
 	}
 

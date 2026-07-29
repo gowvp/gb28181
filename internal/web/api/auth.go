@@ -41,7 +41,7 @@ func AuthMiddleware(secret string, authURL string, handler ...web.HandlerOption)
 				// JWT 解析成功，检查有效期
 				if err := claims.Valid(); err != nil {
 					// token 有效但过期，直接返回需要重新登录，不降级到 authURL
-					web.AbortWithStatusJSON(c, reason.ErrUnauthorizedToken.SetMsg("请重新登录"))
+					web.AbortWithStatusJSON(c, reason.ErrUnauthorizedToken.WithMsg("请重新登录"))
 					return
 				}
 				// JWT 鉴权通过
@@ -57,7 +57,7 @@ func AuthMiddleware(secret string, authURL string, handler ...web.HandlerOption)
 
 		// 无有效 token，检查是否配置了 authURL
 		if authURL == "" {
-			web.AbortWithStatusJSON(c, reason.ErrUnauthorizedToken.SetMsg("身份验证失败"))
+			web.AbortWithStatusJSON(c, reason.ErrUnauthorizedToken.WithMsg("身份验证失败"))
 			return
 		}
 
@@ -87,7 +87,7 @@ func forwardToAuthURL(client *http.Client, c *gin.Context, authURL string) int {
 	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodPost, authURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "构建 authURL 请求失败", "err", err, "authURL", authURL)
-		web.Fail(c, reason.ErrServer.SetHTTPStatus(http.StatusInternalServerError).SetMsg("鉴权服务请求失败"))
+		web.Fail(c, reason.ErrServer.WithHTTPStatus(http.StatusInternalServerError).WithMsg("鉴权服务请求失败"))
 		return http.StatusInternalServerError
 	}
 
@@ -101,7 +101,7 @@ func forwardToAuthURL(client *http.Client, c *gin.Context, authURL string) int {
 	resp, err := client.Do(req)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), "请求 authURL 失败", "err", err, "authURL", authURL)
-		web.Fail(c, reason.ErrServiceUnavailable.SetHTTPStatus(http.StatusBadGateway).SetMsg("鉴权服务不可达: "+err.Error()))
+		web.Fail(c, reason.ErrServiceUnavailable.WithHTTPStatus(http.StatusBadGateway).WithMsg("鉴权服务不可达: "+err.Error()))
 		return http.StatusBadGateway
 	}
 	defer resp.Body.Close()

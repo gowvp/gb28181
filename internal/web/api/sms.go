@@ -75,7 +75,7 @@ func (a SmsAPI) updateMediaServer(c *gin.Context, in *updateMediaServerInput) (a
 		a.uc.Conf.Media.WebHookIP = out.HookIP
 		a.uc.Conf.Media.Type = out.Type
 		if err := conf.WriteConfig(a.uc.Conf, a.uc.Conf.ConfigPath); err != nil {
-			return nil, reason.ErrServer.SetMsg(err.Error())
+			return nil, reason.ErrServer.WithMsg(err.Error())
 		}
 	}
 	return out, err

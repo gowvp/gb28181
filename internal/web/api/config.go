@@ -84,11 +84,11 @@ func (a ConfigAPI) getConfigInfo(c *gin.Context, _ *struct{}) (*getConfigInfoOut
 
 func (a ConfigAPI) updateSIP(_ *gin.Context, in *conf.SIP) (gin.H, error) {
 	if err := copier.Copy(&a.conf.Sip, in); err != nil {
-		return nil, reason.ErrServer.SetMsg(err.Error())
+		return nil, reason.ErrServer.WithMsg(err.Error())
 	}
 
 	if err := conf.WriteConfig(a.conf, a.conf.ConfigPath); err != nil {
-		return nil, reason.ErrServer.SetMsg(err.Error())
+		return nil, reason.ErrServer.WithMsg(err.Error())
 	}
 	a.uc.SipServer.SetConfig()
 

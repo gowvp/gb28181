@@ -110,14 +110,14 @@ type loginOutput struct {
 func (api UserAPI) login(_ *gin.Context, in *loginInput) (*loginOutput, error) {
 	body, err := api.secret.Decrypt(in.Data)
 	if err != nil {
-		return nil, reason.ErrServer.SetMsg(err.Error())
+		return nil, reason.ErrServer.WithMsg(err.Error())
 	}
 	var credentials struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 	if err := json.Unmarshal(body, &credentials); err != nil {
-		return nil, reason.ErrServer.SetMsg(err.Error())
+		return nil, reason.ErrServer.WithMsg(err.Error())
 	}
 
 	// 验证用户名和密码
@@ -133,7 +133,7 @@ func (api UserAPI) login(_ *gin.Context, in *loginInput) (*loginOutput, error) {
 
 	token, err := web.NewToken(data, api.conf.Server.HTTP.JwtSecret, web.WithExpiresAt(time.Now().Add(3*24*time.Hour)))
 	if err != nil {
-		return nil, reason.ErrServer.SetMsg("生成token失败: " + err.Error())
+		return nil, reason.ErrServer.WithMsg("生成token失败: " + err.Error())
 	}
 
 	return &loginOutput{
@@ -151,7 +151,7 @@ type updateCredentialsInput struct {
 func (api UserAPI) updateCredentials(_ *gin.Context, in *updateCredentialsInput) (gin.H, error) {
 	body, err := api.secret.Decrypt(in.Data)
 	if err != nil {
-		return nil, reason.ErrServer.SetMsg(err.Error())
+		return nil, reason.ErrServer.WithMsg(err.Error())
 	}
 	var credentials struct {
 		OldPassword string `json:"old_password"`
@@ -159,11 +159,11 @@ func (api UserAPI) updateCredentials(_ *gin.Context, in *updateCredentialsInput)
 		Password    string `json:"password"`
 	}
 	if err := json.Unmarshal(body, &credentials); err != nil {
-		return nil, reason.ErrServer.SetMsg(err.Error())
+		return nil, reason.ErrServer.WithMsg(err.Error())
 	}
 
 	if credentials.Username == "" || credentials.Password == "" {
-		return nil, reason.ErrServer.SetMsg("账号和密码不能为空")
+		return nil, reason.ErrServer.WithMsg("账号和密码不能为空")
 	}
 
 	// 校验旧密码
@@ -172,14 +172,14 @@ func (api UserAPI) updateCredentials(_ *gin.Context, in *updateCredentialsInput)
 		currentPassword = "admin"
 	}
 	if credentials.OldPassword != currentPassword {
-		return nil, reason.ErrServer.SetMsg("旧密码错误")
+		return nil, reason.ErrServer.WithMsg("旧密码错误")
 	}
 
 	api.conf.Server.Username = credentials.Username
 	api.conf.Server.Password = credentials.Password
 
 	if err := conf.WriteConfig(api.conf, api.conf.ConfigPath); err != nil {
-		return nil, reason.ErrServer.SetMsg("保存配置失败: " + err.Error())
+		return nil, reason.ErrServer.WithMsg("保存配置失败: " + err.Error())
 	}
 
 	return gin.H{"msg": "凭据更新成功"}, nil
@@ -188,7 +188,7 @@ func (api UserAPI) updateCredentials(_ *gin.Context, in *updateCredentialsInput)
 func (api UserAPI) getPublicKey(_ *gin.Context, _ *struct{}) (gin.H, error) {
 	publicKey, err := api.secret.GetOrCreatePublicKey()
 	if err != nil {
-		return nil, reason.ErrServer.SetMsg(err.Error())
+		return nil, reason.ErrServer.WithMsg(err.Error())
 	}
 	result := api.secret.MarshalPKIXPublicKey(publicKey)
 	return gin.H{"key": base64.StdEncoding.EncodeToString(result)}, nil

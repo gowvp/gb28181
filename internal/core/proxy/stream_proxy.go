@@ -67,7 +67,7 @@ func (c *Core) CreateStreamProxy(ctx context.Context, in *AddStreamProxyInput) (
 	out.App = "live"
 	if err := c.store.StreamProxy().Create(ctx, &out); err != nil {
 		if orm.IsDuplicatedKey(err) {
-			return nil, reason.ErrDB.SetMsg("stream 重复，请勿重复添加")
+			return nil, reason.ErrDB.WithMsg("stream 重复，请勿重复添加")
 		}
 		return nil, reason.ErrDB.Withf(`Create err[%s]`, err.Error())
 	}
