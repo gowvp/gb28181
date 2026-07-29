@@ -32,7 +32,7 @@ type Driver interface {
 	AddStreamProxy(ctx context.Context, ms *MediaServer, req *AddStreamProxyRequest) (*zlm.AddStreamProxyResponse, error)
 	GetSnapshot(ctx context.Context, ms *MediaServer, req *GetSnapRequest) ([]byte, error)
 
-	GetStreamLiveAddr(ctx context.Context, ms *MediaServer, httpPrefix, host, app, stream string) StreamLiveAddr
+	GetStreamLiveAddr(ctx context.Context, ms *MediaServer, httpPrefix, host, app, stream, token string) StreamLiveAddr
 
 	// Recording Operations
 	StartRecord(ctx context.Context, ms *MediaServer, req *zlm.StartRecordRequest) (*zlm.StartRecordResponse, error)

@@ -24,15 +24,15 @@ type LalmaxDriver struct {
 }
 
 // GetStreamLiveAddr implements Driver.
-func (l *LalmaxDriver) GetStreamLiveAddr(ctx context.Context, ms *MediaServer, httpPrefix string, host string, app string, stream string) StreamLiveAddr {
+func (l *LalmaxDriver) GetStreamLiveAddr(ctx context.Context, ms *MediaServer, httpPrefix string, host string, app string, stream string, token string) StreamLiveAddr {
 	var out StreamLiveAddr
 	out.Label = "StreamSVR"
 	wsPrefix := strings.Replace(strings.Replace(httpPrefix, "https", "wss", 1), "http", "ws", 1)
-	out.WSFLV = fmt.Sprintf("%s/proxy/sms/%s.flv", wsPrefix, stream)
-	out.HTTPFLV = fmt.Sprintf("%s/proxy/sms/%s.flv", httpPrefix, stream)
-	out.HLS = fmt.Sprintf("%s/proxy/sms/%s/hls.fmp4.m3u8", httpPrefix, stream)
+	out.WSFLV = fmt.Sprintf("%s/proxy/sms/%s.flv?token=%s", wsPrefix, stream, token)
+	out.HTTPFLV = fmt.Sprintf("%s/proxy/sms/%s.flv?token=%s", httpPrefix, stream, token)
+	out.HLS = fmt.Sprintf("%s/proxy/sms/%s/hls.fmp4.m3u8?token=%s", httpPrefix, stream, token)
 	rtcPrefix := strings.Replace(strings.Replace(httpPrefix, "https", "webrtc", 1), "http", "webrtc", 1)
-	out.WebRTC = fmt.Sprintf("%s/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play", rtcPrefix, app, stream)
+	out.WebRTC = fmt.Sprintf("%s/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play&token=%s", rtcPrefix, app, stream, token)
 	out.RTMP = fmt.Sprintf("rtmp://%s:%d/%s", host, ms.Ports.RTMP, stream)
 	out.RTSP = fmt.Sprintf("rtsp://%s:%d/%s", host, ms.Ports.RTSP, stream)
 	return out

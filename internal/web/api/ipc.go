@@ -448,7 +448,16 @@ func (a IPCAPI) play(c *gin.Context, in *channelIDInput) (*playOutput, error) {
 		host = h
 	}
 
-	item := a.uc.SMSAPI.smsCore.GetStreamLiveAddr(svr, prefix, host, app, appStream)
+	playToken, err := web.NewToken(
+		map[string]any{"stream": appStream, "app": app},
+		a.uc.Conf.Server.HTTP.JwtSecret+"_play",
+		web.WithExpiresAt(time.Now().Add(42*time.Hour)),
+	)
+	if err != nil {
+		return nil, reason.ErrServer.WithMsg("生成播放token失败")
+	}
+
+	item := a.uc.SMSAPI.smsCore.GetStreamLiveAddr(svr, prefix, host, app, appStream, playToken)
 	out := playOutput{
 		App:    app,
 		Stream: appStream,
