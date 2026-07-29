@@ -38,6 +38,11 @@ func (l *LalmaxDriver) GetStreamLiveAddr(ctx context.Context, ms *MediaServer, h
 	return out
 }
 
+// GetMediaInfo implements Driver.
+func (l *LalmaxDriver) GetMediaInfo(ctx context.Context, ms *MediaServer, app, stream string) ([]zlm.MediaItem, error) {
+	return nil, fmt.Errorf("lalmax 暂不支持获取流详细信息")
+}
+
 // AddStreamProxy implements Driver.
 func (l *LalmaxDriver) AddStreamProxy(ctx context.Context, ms *MediaServer, req *AddStreamProxyRequest) (*zlm.AddStreamProxyResponse, error) {
 	engine := l.withConfig(ms)

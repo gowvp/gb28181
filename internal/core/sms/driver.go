@@ -33,6 +33,7 @@ type Driver interface {
 	GetSnapshot(ctx context.Context, ms *MediaServer, req *GetSnapRequest) ([]byte, error)
 
 	GetStreamLiveAddr(ctx context.Context, ms *MediaServer, httpPrefix, host, app, stream, token string) StreamLiveAddr
+	GetMediaInfo(ctx context.Context, ms *MediaServer, app, stream string) ([]zlm.MediaItem, error)
 
 	// Recording Operations
 	StartRecord(ctx context.Context, ms *MediaServer, req *zlm.StartRecordRequest) (*zlm.StartRecordResponse, error)

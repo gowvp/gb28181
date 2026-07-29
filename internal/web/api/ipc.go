@@ -164,6 +164,7 @@ func registerGB28181(g gin.IRouter, api IPCAPI, handler ...gin.HandlerFunc) {
 		group.POST("/:id/record_mode", web.WrapH(api.setRecordMode)) // 设置录像模式
 		group.POST("/:id/ptz/control", web.WrapH(api.ptzControl))    // 云台控制（所有协议）
 		group.POST("/:id/stop", web.WrapH(api.stopPlay))             // 停止播放（所有协议）
+		group.GET("/:id/media_info", web.WrapH(api.getMediaInfo))    // 获取流详细信息（音视频编码等）
 	}
 }
 
@@ -590,6 +591,43 @@ func (a IPCAPI) stopPlay(c *gin.Context, in *channelIDInput) (gin.H, error) {
 
 	log.InfoContext(ctx, "停止播放完成")
 	return gin.H{"msg": "ok"}, nil
+}
+
+// getMediaInfo 获取指定通道流的详细信息（音视频编码、分辨率、帧率等）
+func (a IPCAPI) getMediaInfo(c *gin.Context, in *channelIDInput) (any, error) {
+	channelID := in.ID
+	ctx := c.Request.Context()
+
+	ch, err := a.ipc.GetChannel(ctx, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	app := ch.GetApp()
+	stream := ch.GetStream()
+	if app == "" {
+		app = "rtp"
+	}
+
+	mediaServerID := ch.Config.MediaServerID
+	if mediaServerID == "" {
+		mediaServerID = sms.DefaultMediaServerID
+	}
+
+	svr, err := a.uc.SMSAPI.smsCore.GetMediaServer(ctx, mediaServerID)
+	if err != nil {
+		return nil, err
+	}
+
+	items, err := a.uc.SMSAPI.smsCore.GetMediaInfo(svr, app, stream)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, reason.ErrNotFound.WithMsg("流不在线或不存在")
+	}
+
+	return items[0], nil
 }
 
 type refreshSnapshotInput struct {

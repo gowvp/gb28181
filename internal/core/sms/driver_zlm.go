@@ -285,6 +285,21 @@ func (d *ZLMDriver) GetSnapshot(ctx context.Context, ms *MediaServer, req *GetSn
 	return engine.GetSnap(req.GetSnapRequest)
 }
 
+// GetMediaInfo 获取指定流的详细音视频轨道信息
+func (d *ZLMDriver) GetMediaInfo(ctx context.Context, ms *MediaServer, app, stream string) ([]zlm.MediaItem, error) {
+	engine := d.withConfig(ms)
+	resp, err := engine.GetMediaInfo(zlm.GetMediaInfoRequest{
+		Schema: "rtsp",
+		Vhost:  "__defaultVhost__",
+		App:    app,
+		Stream: stream,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Data, nil
+}
+
 // StartRecord 开始录制，通知 ZLM 对指定流进行 MP4 录制
 func (d *ZLMDriver) StartRecord(ctx context.Context, ms *MediaServer, req *zlm.StartRecordRequest) (*zlm.StartRecordResponse, error) {
 	engine := d.withConfig(ms)

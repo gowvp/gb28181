@@ -305,6 +305,15 @@ func (n *NodeManager) GetStreamLiveAddr(server *MediaServer, httpPrefix, host, a
 	return driver.GetStreamLiveAddr(context.Background(), server, httpPrefix, host, app, stream, token)
 }
 
+// GetMediaInfo 获取指定流的详细音视频轨道信息
+func (n *NodeManager) GetMediaInfo(server *MediaServer, app, stream string) ([]zlm.MediaItem, error) {
+	driver, err := n.getDriver(server.Type)
+	if err != nil {
+		return nil, err
+	}
+	return driver.GetMediaInfo(context.Background(), server, app, stream)
+}
+
 // StartRecord 开始录制指定流
 func (n *NodeManager) StartRecord(server *MediaServer, in zlm.StartRecordRequest) (*zlm.StartRecordResponse, error) {
 	driver, err := n.getDriver(server.Type)

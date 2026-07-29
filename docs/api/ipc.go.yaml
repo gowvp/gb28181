@@ -648,6 +648,88 @@ paths:
                     description: 返回消息
                     example: AI 检测已停止
 
+  /channels/{id}/media_info:
+    get:
+      summary: 获取流详细信息
+      description: 获取指定通道流的详细信息，包括音视频编码、分辨率、帧率、采样率等
+      tags:
+        - 通道管理
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 通道 ID
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  app:
+                    type: string
+                    description: 应用名
+                  stream:
+                    type: string
+                    description: 流 ID
+                  schema:
+                    type: string
+                    description: 协议名
+                  vhost:
+                    type: string
+                    description: 虚拟主机
+                  reader_count:
+                    type: integer
+                    description: 当前观看人数
+                  total_reader_count:
+                    type: integer
+                    description: 总观看人数
+                  alive_second:
+                    type: integer
+                    description: 流存活时长（秒）
+                  origin_type_str:
+                    type: string
+                    description: 流来源类型
+                  tracks:
+                    type: array
+                    description: 音视频轨道列表
+                    items:
+                      type: object
+                      properties:
+                        codec_id:
+                          type: integer
+                          description: 编码 ID（H264=0, H265=1, AAC=2, G711A=3, G711U=4）
+                        codec_id_name:
+                          type: string
+                          description: 编码名称
+                        codec_type:
+                          type: integer
+                          description: 轨道类型（Video=0, Audio=1）
+                        ready:
+                          type: boolean
+                          description: 轨道是否就绪
+                        fps:
+                          type: number
+                          description: 视频帧率
+                        width:
+                          type: integer
+                          description: 视频宽度
+                        height:
+                          type: integer
+                          description: 视频高度
+                        channels:
+                          type: integer
+                          description: 音频通道数
+                        sample_bit:
+                          type: integer
+                          description: 音频采样位数
+                        sample_rate:
+                          type: integer
+                          description: 音频采样率
+
 components:
   schemas:
     Device:

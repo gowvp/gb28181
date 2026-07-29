@@ -28,6 +28,9 @@ func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([
 
 	query := orm.NewQuery(3)
 	query.OrderBy("created_at DESC")
+	if in.Key != "" {
+		query.Where("device_id LIKE ? OR name LIKE ?", "%"+in.Key+"%", "%"+in.Key+"%")
+	}
 
 	total, err := c.store.Device().List(ctx, &items, in, query.Encode()...)
 	if err != nil {
@@ -35,11 +38,13 @@ func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([
 	}
 
 	for _, item := range items {
-		// 限制查询通道数量
 		const size = 5
 		item.Children = make([]*Channel, 0, size)
-		query := orm.NewQuery(2).OrderBy("created_at ASC").Where("did=?", item.ID)
-		_, err := c.store.Channel().List(ctx, &item.Children, web.PagerFilter{Size: size}, query.Encode()...)
+		chQuery := orm.NewQuery(2).OrderBy("created_at ASC").Where("did=?", item.ID)
+		if in.Key != "" {
+			chQuery.Where("channel_id LIKE ? OR name LIKE ?", "%"+in.Key+"%", "%"+in.Key+"%")
+		}
+		_, err := c.store.Channel().List(ctx, &item.Children, web.PagerFilter{Size: size}, chQuery.Encode()...)
 		if err != nil {
 			continue
 		}
