@@ -116,6 +116,8 @@ func setupRouter(r *gin.Engine, uc *Usecase) {
 	registerSms(r, uc.SMSAPI, auth)
 	RegisterUser(r, uc.UserAPI, auth)
 
+	registerWS(r, uc.Conf.Server.HTTP.JwtSecret)
+
 	// 反向代理流媒体数据
 	r.Any("/proxy/sms/*path", uc.proxySMS)
 

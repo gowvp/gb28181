@@ -2,12 +2,14 @@ package recording
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/gowvp/owl/internal/notify"
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/system"
 	"github.com/ixugo/goddd/pkg/web"
@@ -42,6 +44,7 @@ func (c Core) StartCleanupWorker() {
 				break
 			}
 			slog.Warn("磁盘仍超标，2 分钟后重试清理", "threshold", c.conf.DiskUsageThreshold)
+			notify.Warn(fmt.Sprintf("磁盘使用率超标 (阈值: %.0f%%), 正在清理录像", c.conf.DiskUsageThreshold))
 			time.Sleep(2 * time.Minute)
 		}
 	}

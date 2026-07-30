@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gowvp/owl/internal/notify"
 	"github.com/gowvp/owl/pkg/zlm"
 )
 
@@ -207,6 +208,7 @@ func (d *ZLMDriver) Setup(ctx context.Context, ms *MediaServer, webhookURL strin
 			"from", currentRtcPort, "to", rtcPort)
 		if rerr := engine.RestartServer(); rerr != nil {
 			slog.Warn("ZLM 重启调用失败, WebRTC 可能因端口未重绑而黑屏, 请手动重启容器", "err", rerr)
+			notify.Warn("ZLM 重启调用失败, WebRTC 可能因端口未重绑而黑屏, 请手动重启容器")
 			return nil
 		}
 		waitZLMReady(ctx, engine, rtcPort)
@@ -236,6 +238,7 @@ func waitZLMReady(ctx context.Context, engine zlm.Engine, expectRtcPort string) 
 		}
 	}
 	slog.Warn("等待 ZLM 重启就绪超时, 建议检查容器状态", "expect_rtc_port", expectRtcPort)
+	notify.Warn(fmt.Sprintf("等待 ZLM 重启就绪超时 (期望 rtc.port=%s), 建议检查容器状态", expectRtcPort))
 }
 
 func (d *ZLMDriver) Ping(ctx context.Context, ms *MediaServer) error {

@@ -11,6 +11,7 @@ import (
 	"github.com/gowvp/owl/internal/conf"
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/internal/core/sms"
+	wsnotify "github.com/gowvp/owl/internal/notify"
 	"github.com/gowvp/owl/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/conc"
 	"github.com/ixugo/goddd/pkg/orm"
@@ -141,6 +142,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 				"platform_id", g.cfg.ID,
 				"source", ctx.Source.String(),
 			)
+			wsnotify.IPCWarn("注册失败: SIP 服务器 ID 不匹配", ctx.DeviceID, "")
 			ctx.String(http.StatusForbidden, fmt.Sprintf("server id mismatch, expect %s got %s", g.cfg.ID, reqID))
 			return
 		}
@@ -184,6 +186,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 		auth.SetURI(auth.Get("uri"))
 		if auth.CalcResponse() != auth.Get("response") {
 			ctx.Log.Info("设备注册鉴权失败")
+			wsnotify.IPCWarn("注册鉴权失败: 密码错误", ctx.DeviceID, dev.GetName())
 			ctx.String(http.StatusUnauthorized, "wrong password")
 			return
 		}
@@ -201,6 +204,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	expire := ctx.GetHeader("Expires")
 	if expire == "0" {
 		ctx.Log.Info("设备注销")
+		wsnotify.IPCWarn("设备已注销离线", ctx.DeviceID, dev.GetName())
 		g.logout(ctx.DeviceID, func(b *ipc.Device) error {
 			b.IsOnline = false
 			b.Address = ctx.Source.String()
@@ -225,7 +229,7 @@ func (g *GB28181API) handlerRegister(ctx *sip.Context) {
 	// fmt.Printf(">>> %p\n", conn
 
 	ctx.Log.Info("设备注册成功")
-	// ctx.Log.Debug("device info", "source", ctx.Source, "host", ctx.Host)
+	wsnotify.IPCInfo("设备注册上线", ctx.DeviceID, dev.GetName())
 
 	respFn()
 
