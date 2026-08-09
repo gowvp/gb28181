@@ -299,7 +299,7 @@ services:
 ## 功能特性
 
 - [x] 开箱即用，支持响应式 web 管理
-- [x] 支持输出 HTTP_FLV,Websocket_FLV,HLS,WebRTC,RTSP、RTMP 等多种协议流地址
+- [x] 支持输出 FLV、WS-FLV、HLS、WebRTC、RTSP、RTMP 等多种协议流地址
 - [x] 支持局域网/互联网/多层 NAT/特殊网络环境部署
 - [x] 支持 SQLite 数据库快速部署
 - [x] 支持 PostgreSQL/MySQL 数据库

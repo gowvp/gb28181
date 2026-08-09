@@ -40,11 +40,11 @@ type GetSnapRequest struct {
 }
 
 type StreamLiveAddr struct {
-	Label   string `json:"label"`
-	WSFLV   string `json:"ws_flv"`
-	HTTPFLV string `json:"http_flv"`
-	RTMP    string `json:"rtmp"`
-	RTSP    string `json:"rtsp"`
-	WebRTC  string `json:"webrtc"`
-	HLS     string `json:"hls"`
+	Label  string `json:"label"`
+	WSFLV  string `json:"ws-flv"`
+	FLV    string `json:"flv"`
+	RTMP   string `json:"rtmp"`
+	RTSP   string `json:"rtsp"`
+	WebRTC string `json:"webrtc"`
+	HLS    string `json:"hls"`
 }

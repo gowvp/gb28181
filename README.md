@@ -245,7 +245,7 @@ If you're a Go developer familiar with Docker, you can download the source code 
 ## Features
 
 - [x] Out-of-the-box with responsive web management
-- [x] Multiple protocol output: HTTP_FLV, Websocket_FLV, HLS, WebRTC, RTSP, RTMP
+- [x] Multiple protocol output: FLV, WS-FLV, HLS, WebRTC, RTSP, RTMP
 - [x] LAN/Internet/Multi-layer NAT/Special network environment deployment
 - [x] SQLite database for quick deployment
 - [x] PostgreSQL/MySQL database support

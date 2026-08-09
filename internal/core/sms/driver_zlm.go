@@ -46,7 +46,7 @@ func (d *ZLMDriver) GetStreamLiveAddr(ctx context.Context, ms *MediaServer, http
 	out.Label = "ZLM"
 	wsPrefix := strings.Replace(strings.Replace(httpPrefix, "https", "wss", 1), "http", "ws", 1)
 	out.WSFLV = fmt.Sprintf("%s/proxy/sms/%s/%s.live.flv?token=%s", wsPrefix, app, stream, token)
-	out.HTTPFLV = fmt.Sprintf("%s/proxy/sms/%s/%s.live.flv?token=%s", httpPrefix, app, stream, token)
+	out.FLV = fmt.Sprintf("%s/proxy/sms/%s/%s.live.flv?token=%s", httpPrefix, app, stream, token)
 	out.HLS = fmt.Sprintf("%s/proxy/sms/%s/%s/hls.fmp4.m3u8?token=%s", httpPrefix, app, stream, token)
 	rtcPrefix := strings.Replace(strings.Replace(httpPrefix, "https", "webrtc", 1), "http", "webrtc", 1)
 	out.WebRTC = fmt.Sprintf("%s/proxy/sms/index/api/webrtc?app=%s&stream=%s&type=play&token=%s", rtcPrefix, app, stream, token)
