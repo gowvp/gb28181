@@ -255,7 +255,7 @@ func buildPlaySDP(deviceID, channelID, ip string, port int, streamMode int8, ssr
 	}
 
 	body := msg.Append(nil).AppendTo(nil)
-	body = append(body, "f=\r\n"...)
+	body = append(body, "f=v/////a/1/8/1\r\n"...)
 	return body
 }
 
