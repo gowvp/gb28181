@@ -2,10 +2,13 @@
 package metadataapi
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gowvp/owl/internal/core/metadata"
 	"github.com/gowvp/owl/internal/core/metadata/store/metadatadb"
 	"github.com/ixugo/goddd/pkg/orm"
+	"github.com/ixugo/goddd/pkg/reason"
 	"github.com/ixugo/goddd/pkg/web"
 	"gorm.io/gorm"
 )
@@ -53,9 +56,16 @@ func RegisterMetadata(g gin.IRouter, api MetadataAPI, handler ...gin.HandlerFunc
 // 	return gin.H{"items": items, "total": total}, err
 // }
 
-// getMetadata 按 ID 查询数据
+// getMetadata 按 ID 查询数据，未找到时返回空对象而非错误，避免前端 400
 func (a MetadataAPI) getMetadata(c *gin.Context, in *metadataIDInput) (*metadata.Metadata, error) {
-	return a.metadataCore.GetMetadata(c.Request.Context(), in.ID)
+	out, err := a.metadataCore.GetMetadata(c.Request.Context(), in.ID)
+	if err != nil {
+		if errors.Is(err, reason.ErrNotFound) {
+			return &metadata.Metadata{ID: in.ID}, nil
+		}
+		return nil, err
+	}
+	return out, nil
 }
 
 // saveMetadata 幂等保存：已存在则更新，不存在则创建
