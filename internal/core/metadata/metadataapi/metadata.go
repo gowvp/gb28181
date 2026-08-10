@@ -37,9 +37,11 @@ type saveMetadataInput struct {
 }
 
 // RegisterMetadata 注册通用数据持久化路由
+// GET 读取不鉴权：登录页需要在未认证状态下加载页面配置（login_page 等），
+// 鉴权会导致 401→重定向→登录页→再请求→401 死循环。
 func RegisterMetadata(g gin.IRouter, api MetadataAPI, handler ...gin.HandlerFunc) {
+	g.GET("/metadatas/:id", web.WrapH(api.getMetadata))
 	group := g.Group("/metadatas", handler...)
-	group.GET("/:id", web.WrapH(api.getMetadata))
 	group.POST("/:id", web.WrapH(api.saveMetadata))
 }
 
