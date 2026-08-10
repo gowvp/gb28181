@@ -266,7 +266,6 @@ If you're a Go developer familiar with Docker, you can download the source code 
   - [x] g711a/g711u/aac audio codec support
   - [x] Snapshots
   - [x] CORS support
-  - [ ] SD Recording playback (ipc, recorded on camera SD card, no development plan)
 - [x] ONVIF device access and playback (client)
 - [x] ONVIF virtual device / server (expose channels to Home Assistant, etc.)
 - [x] RTMP push streaming support
@@ -275,6 +274,13 @@ If you're a Go developer familiar with Docker, you can download the source code 
 - [x] Cloud Recording playback (owl)
 - [ ] ONVIF PTZ control support
 - [x] Chinese and English language support
+
+**OWL PRO**
+
+- [x] 分屏预览
+- [x] 分屏卡存录像回放(摄像头内置录像)
+- [x] 主子码流
+- [x] 自研 owl 播放器，兼容不同环境的 H265 流播放(仅支持 FLV 协议)
 
 ## ONVIF Virtual Device (Server)
 

@@ -227,12 +227,7 @@ ZLM使用文档 [github.com/ZLMediaKit/ZLMediaKit](https://github.com/ZLMediaKit
 
 [如何用 docker compose 部署项目](https://www.bilibili.com/video/BV112QYY3EZX)
 
-
-
-
 [docker hub](https://hub.docker.com/r/gospace/gowvp)
-
-
 
 ** gowvp & zlmediakit 融合镜像(推荐)**
 
@@ -298,6 +293,8 @@ services:
 
 ## 功能特性
 
+**OWL**
+
 - [x] 开箱即用，支持响应式 web 管理
 - [x] 支持输出 FLV、WS-FLV、HLS、WebRTC、RTSP、RTMP 等多种协议流地址
 - [x] 支持局域网/互联网/多层 NAT/特殊网络环境部署
@@ -320,17 +317,22 @@ services:
   - [x] 音频支持 g711a/g711u/aac
   - [x] 快照
   - [x] 支持跨域
-  - [ ] 卡存录像回放(由 摄像头 录制在SD卡，暂无开发计划)
 - [x] 支持 onvif 接入与播放（客户端，发现外部摄像机）
 - [x] 支持 onvif 虚拟设备/服务端（向 Home Assistant 等暴露平台通道）
 - [x] 支持 rtmp 推流
 - [x] 支持 rtsp 拉流
 - [x] 支持 ai 算法分析与告警
-- [x] 云端录像回放(由 owl 录制)
+- [x] 平台录像回放(由 owl 录制在服务器磁盘)
 - [ ] 支持 ONVIF PTZ 云台控制
 - [x] 支持中文和 English
 - [x] SIP IP 限流，国外攻击特征系统防护，防止云服务被境外 sip 攻击
 
+**OWL PRO**
+
+- [x] 分屏预览
+- [x] 分屏卡存录像回放(摄像头内置录像)
+- [x] 主子码流
+- [x] 自研 owl 播放器，兼容不同环境的 H265 流播放(仅支持 FLV 协议)
 
 ## ONVIF 虚拟设备（服务端）
 

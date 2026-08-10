@@ -46,3 +46,4 @@ __pycache__/
 owl
 .cursor/memory/
 .cursor/scopes/
+graphify-out/
