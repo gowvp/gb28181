@@ -1,6 +1,8 @@
 package gbs
 
 import (
+	"log/slog"
+
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/orm"
@@ -21,12 +23,19 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 	}
 
 	// 程序重启后内存丢失，收到 keepalive 时补上
+	_, alreadyLoaded := g.svr.memoryStorer.Load(ctx.DeviceID)
 	g.svr.memoryStorer.LoadOrStore(ctx.DeviceID, &Device{
 		conn:   ctx.Request.GetConnection(),
 		source: ctx.Source,
 		to:     ctx.To,
 		region: ctx.To.URI.Host(),
 	})
+
+	// 设备首次进入内存时触发 Catalog 查询，否则 Channels 为空导致"通道不存在"
+	if !alreadyLoaded {
+		slog.Info("keepalive 触发 Catalog 补载", "device_id", ctx.DeviceID)
+		_ = g.QueryCatalog(ctx.DeviceID)
+	}
 
 	if err := g.svr.memoryStorer.Change(ctx.DeviceID, func(d *ipc.Device) error {
 		d.KeepaliveAt = orm.Now()
