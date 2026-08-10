@@ -31,12 +31,6 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 		region: ctx.To.URI.Host(),
 	})
 
-	// 设备首次进入内存时触发 Catalog 查询，否则 Channels 为空导致"通道不存在"
-	if !alreadyLoaded {
-		slog.Info("keepalive 触发 Catalog 补载", "device_id", ctx.DeviceID)
-		_ = g.QueryCatalog(ctx.DeviceID)
-	}
-
 	if err := g.svr.memoryStorer.Change(ctx.DeviceID, func(d *ipc.Device) error {
 		d.KeepaliveAt = orm.Now()
 		d.IsOnline = true // 收到心跳即视为在线，不依赖 Status 字段值
@@ -50,6 +44,12 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 		d.region = ctx.To.URI.Host()
 	}); err != nil {
 		ctx.Log.Error("keepalive", "err", err)
+	}
+
+	// 必须在 Change(IsOnline=true) 之后触发，QueryCatalog 会检查 IsOnline
+	if !alreadyLoaded {
+		slog.Info("keepalive 触发 Catalog 补载", "device_id", ctx.DeviceID)
+		_ = g.QueryCatalog(ctx.DeviceID)
 	}
 
 	ctx.String(200, "OK")
