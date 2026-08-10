@@ -140,6 +140,7 @@ func (d *ZLMDriver) Setup(ctx context.Context, ms *MediaServer, webhookURL strin
 		ProtocolEnableFmp4:    new("0"),
 		ProtocolEnableHls:     new("0"),
 		ProtocolEnableHlsFmp4: new("1"),
+		RtmpEnhanced:          new("1"),
 
 		HookOnPlay:                     new(fmt.Sprintf("%s/on_play", webhookURL)),
 		HookOnPublish:                  new(fmt.Sprintf("%s/on_publish", webhookURL)),
