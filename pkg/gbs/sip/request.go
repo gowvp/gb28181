@@ -43,29 +43,43 @@ func NewRequest(
 	return req
 }
 
-// NewRequestFromResponse NewRequestFromResponse
+// NewRequestFromResponse 基于 SIP 响应构造同一对话内的后续请求（ACK/BYE/INFO 等）。
+// 防御性处理：Response 可能来自异常设备，缺少 Contact/Via/CSeq 等必选头部时不 panic，
+// 用 To 地址兜底或跳过对应字段，确保 logout 等清理路径不会因残缺响应导致进程崩溃。
 func NewRequestFromResponse(method string, resp *Response) *Request {
-	contact, _ := resp.Contact()
+	// Request-URI 优先取 Contact，缺失则回退 To（RFC 3261 §12.2.1.1）
+	var recipient *URI
+	if contact, ok := resp.Contact(); ok && contact != nil && contact.Address != nil {
+		recipient = contact.Address
+	} else if to, ok := resp.To(); ok && to != nil && to.Address != nil {
+		recipient = to.Address
+	}
+
 	ackRequest := NewRequest(
 		resp.MessageID(),
 		method,
-		contact.Address,
+		recipient,
 		resp.SipVersion(),
 		[]Header{},
 		[]byte{},
 	)
 
 	CopyHeaders("Via", resp, ackRequest)
-	viaHop, _ := ackRequest.ViaHop()
-	// update branch, 2xx ACK is separate Tx
-	viaHop.Params.Add("branch", String{Str: GenerateBranch()})
+	if viaHop, ok := ackRequest.ViaHop(); ok && viaHop != nil {
+		// update branch, 2xx ACK is separate Tx
+		viaHop.Params.Add("branch", String{Str: GenerateBranch()})
+	}
 
 	if len(resp.GetHeaders("Route")) > 0 {
 		CopyHeaders("Route", resp, ackRequest)
 	} else {
 		for _, h := range resp.GetHeaders("Record-Route") {
-			uris := make([]*URI, 0)
-			for _, u := range h.(*RecordRouteHeader).Addresses {
+			rr, ok := h.(*RecordRouteHeader)
+			if !ok || rr == nil {
+				continue
+			}
+			uris := make([]*URI, 0, len(rr.Addresses))
+			for _, u := range rr.Addresses {
 				uris = append(uris, u.Clone())
 			}
 			ackRequest.AppendHeader(&RouteHeader{
@@ -77,22 +91,14 @@ func NewRequestFromResponse(method string, resp *Response) *Request {
 	CopyHeaders("From", resp, ackRequest)
 	CopyHeaders("To", resp, ackRequest)
 	CopyHeaders("Call-ID", resp, ackRequest)
-	cseq, _ := resp.CSeq()
-	cseq.MethodName = method
-
-	// https://www.rfc-editor.org/rfc/rfc3261.html#section-12.2.1.1
-	// The Call-ID of the request MUST be set to the Call-ID of the dialog.
-	// Requests within a dialog MUST contain strictly monotonically
-	// increasing and contiguous CSeq sequence numbers (increasing-by-one)
-	// in each direction (excepting ACK and CANCEL of course, whose numbers
-	// equal the requests being acknowledged or cancelled).  Therefore, if
-	// the local sequence number is not empty, the value of the local
-	// sequence number MUST be incremented by one, and this value MUST be
-	// placed into the CSeq header field.
-	if !(method == MethodACK || method == MethodCancel) {
-		cseq.SeqNo++
+	if cseq, ok := resp.CSeq(); ok && cseq != nil {
+		cseq.MethodName = method
+		// https://www.rfc-editor.org/rfc/rfc3261.html#section-12.2.1.1
+		if !(method == MethodACK || method == MethodCancel) {
+			cseq.SeqNo++
+		}
+		ackRequest.AppendHeader(cseq)
 	}
-	ackRequest.AppendHeader(cseq)
 	ackRequest.SetSource(resp.Destination())
 	ackRequest.SetDestination(resp.Source())
 	return ackRequest
