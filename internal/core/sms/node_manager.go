@@ -201,8 +201,7 @@ func (n *NodeManager) connection(server *MediaServer, serverPort int) error {
 	log.Info("MediaServer 连接中...")
 
 	ctx := context.Background()
-	if err := driver.Connect(ctx, server); err != nil {
-		log.Error("MediaServer 连接失败", "err", err)
+	if err := n.connectWithRetry(ctx, driver, server, log); err != nil {
 		return err
 	}
 	log.Info("MediaServer 连接成功")
@@ -225,6 +224,39 @@ func (n *NodeManager) connection(server *MediaServer, serverPort int) error {
 	}
 
 	return nil
+}
+
+const (
+	// connectMaxRetries 启动时连接流媒体服务器的最大重试次数，
+	// 同容器部署时 ZLM 可能晚于 gowvp 就绪，需等待。
+	connectMaxRetries = 30
+	// connectRetryInterval 重试间隔，30 次 × 1s = 最多等 30s。
+	connectRetryInterval = time.Second
+)
+
+// connectWithRetry 带重试的 Connect，应对 ZLM 晚于 gowvp 就绪的启动时序。
+func (n *NodeManager) connectWithRetry(ctx context.Context, driver Driver, server *MediaServer, log *slog.Logger) error {
+	var lastErr error
+	for i := range connectMaxRetries {
+		select {
+		case <-n.quit:
+			return fmt.Errorf("node manager closed")
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if lastErr = driver.Connect(ctx, server); lastErr == nil {
+			return nil
+		}
+
+		if i == 0 {
+			log.Warn("MediaServer 尚未就绪，等待重试", "err", lastErr)
+		}
+		time.Sleep(connectRetryInterval)
+	}
+	log.Error("MediaServer 连接失败，已耗尽重试", "attempts", connectMaxRetries, "err", lastErr)
+	return lastErr
 }
 
 func (n *NodeManager) Keepalive(serverID string) {

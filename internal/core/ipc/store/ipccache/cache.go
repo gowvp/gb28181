@@ -116,6 +116,11 @@ func (c *Cache) Change(deviceID string, changeFn func(*ipc.Device) error, change
 	return nil
 }
 
+// DeleteDevice implements gbs.MemoryStorer.
+func (c *Cache) DeleteDevice(deviceID string) {
+	c.devices.Delete(deviceID)
+}
+
 // GetChannel implements gbs.MemoryStorer.
 func (c *Cache) GetChannel(deviceID string, channelID string) (*gbs.Channel, bool) {
 	dev, ok := c.devices.Load(deviceID)

@@ -6,6 +6,8 @@ import (
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/pkg/gbs/sip"
 	"github.com/ixugo/goddd/pkg/orm"
+
+	wsnotify "github.com/gowvp/owl/internal/notify"
 )
 
 // MessageNotify 心跳包 XML 结构
@@ -43,7 +45,15 @@ func (g *GB28181API) sipMessageKeepalive(ctx *sip.Context) {
 		d.to = ctx.To
 		d.region = ctx.To.URI.Host()
 	}); err != nil {
+		if orm.IsErrRecordNotFound(err) {
+			g.svr.memoryStorer.DeleteDevice(ctx.DeviceID)
+			ctx.Log.Warn("keepalive 拒绝: 设备未注册，需先 REGISTER")
+			wsnotify.IPCWarn("心跳被拒: 设备未注册", ctx.DeviceID, "")
+			ctx.String(401, "Unauthorized - device need registered")
+			return
+		}
 		ctx.Log.Error("keepalive", "err", err)
+		return
 	}
 
 	// 必须在 Change(IsOnline=true) 之后触发，QueryCatalog 会检查 IsOnline

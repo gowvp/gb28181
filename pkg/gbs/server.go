@@ -29,9 +29,8 @@ type MemoryStorer interface {
 
 	Load(deviceID string) (*Device, bool)
 	Store(deviceID string, value *Device)
+	DeleteDevice(deviceID string)
 	GetChannel(deviceID, channelID string) (*Channel, bool)
-
-	// Change(deviceID string, changeFn func(*ipc.Device)) // 修改设备
 }
 
 type Server struct {
