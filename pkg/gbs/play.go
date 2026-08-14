@@ -11,6 +11,7 @@ import (
 
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/internal/core/sms"
+	wsnotify "github.com/gowvp/owl/internal/notify"
 	"github.com/gowvp/owl/pkg/gbs/m"
 	"github.com/gowvp/owl/pkg/gbs/sip"
 	"github.com/gowvp/owl/pkg/zlm"
@@ -74,6 +75,7 @@ func (g *GB28181API) Play(in *PlayInput) error {
 	ch, ok := g.svr.memoryStorer.GetChannel(in.Channel.DeviceID, in.Channel.ChannelID)
 	if !ok {
 		log.Error("通道不存在")
+		wsnotify.IPCWarn("通道不存在，请等待设备注册或心跳后再试", in.Channel.DeviceID, in.Channel.ChannelID)
 		return ErrChannelNotExist
 	}
 
@@ -132,10 +134,12 @@ func (g *GB28181API) Play(in *PlayInput) error {
 			})
 			if err != nil {
 				log.Debug("1.2. 重新开启RTP服务器失败", "err", err)
+				wsnotify.IPCWarn("RTP服务器开启失败: "+err.Error(), in.Channel.DeviceID, in.Channel.ChannelID)
 				return err
 			}
 			log.Info("成功重新打开RTP服务器", "port", resp.Port)
 		} else {
+			wsnotify.IPCWarn("RTP服务器开启失败: "+err.Error(), in.Channel.DeviceID, in.Channel.ChannelID)
 			return err
 		}
 	}
@@ -143,7 +147,7 @@ func (g *GB28181API) Play(in *PlayInput) error {
 	log.Debug("2. 发送SDP请求", "port", resp.Port)
 	if err := g.sipPlayPush2(ch, in, resp.Port, stream); err != nil {
 		log.Debug("2.1. 发送SDP请求失败", "err", err)
-		// INVITE 失败（含 400 Bad Request），确保播放状态被清除
+		wsnotify.IPCWarn("INVITE失败: "+err.Error(), in.Channel.DeviceID, in.Channel.ChannelID)
 		g.svr.gb.core.UpdatePlaying(context.TODO(), in.Channel.DeviceID, in.Channel.ChannelID, false)
 		return err
 	}

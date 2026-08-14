@@ -84,6 +84,7 @@ func NewServer(cfg *conf.Bootstrap, store ipc.Adapter, sc sms.Core) (*Server, fu
 		c.Next()
 	})
 	svr.Register(api.handlerRegister)
+	svr.Bye(api.handleBYE)
 	msg := svr.Message()
 	msg.Handle("Keepalive", api.sipMessageKeepalive)
 	msg.Handle("Catalog", api.sipMessageCatalog)

@@ -76,6 +76,10 @@ func (s *Server) Register(handler ...HandlerFunc) {
 	s.addRoute(MethodRegister, handler...)
 }
 
+func (s *Server) Bye(handler ...HandlerFunc) {
+	s.addRoute(MethodBYE, handler...)
+}
+
 func (s *Server) Message(handler ...HandlerFunc) *RouteGroup {
 	s.addRoute(MethodMessage, handler...)
 	return newRouteGroup(MethodMessage, s, handler...)
