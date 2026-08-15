@@ -321,7 +321,10 @@ func (s *Server) handlerRequest(msg *Request) {
 	ctx.handlers = chain
 	ctx.From = s.from
 	ctx.svr = s
-	go ctx.Next()
+	go func() {
+		ctx.Next()
+		tx.Close()
+	}()
 }
 
 func (s *Server) handlerResponse(msg *Response) {
