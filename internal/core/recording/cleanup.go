@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"time"
 
@@ -50,11 +51,13 @@ func (c Core) StartCleanupWorker() {
 	}
 }
 
-// runCleanup 执行清理流程：先预标记即将过期的录像，再清理过期录像，最后处理磁盘空间
+// runCleanup 执行清理流程：先预标记即将过期的录像，再清理过期录像，
+// 然后清理文件系统上超龄的孤儿目录，最后处理磁盘空间
 // 返回 true 表示磁盘仍超标，调用方应短间隔重试
 func (c Core) runCleanup() bool {
 	c.markExpiringRecordings()
 	c.cleanupExpiredRecordings()
+	c.cleanupOrphanDirs()
 	return c.cleanupByDiskUsage()
 }
 
@@ -236,6 +239,13 @@ func (c Core) cleanupByDiskUsage() bool {
 		slog.Warn("磁盘清理达到批次上限，2 分钟后重试", "max_batches", maxBatches, "deleted", deletedCount, "failed", failedCount)
 	}
 
+	// DB 已无可删录像但磁盘仍超标时，按文件系统最旧优先删除孤儿目录
+	if !reachedMax {
+		if u, e := getDiskUsage(absStorageDir); e == nil && u >= c.conf.DiskUsageThreshold {
+			c.cleanupDiskByFilesystem(absStorageDir)
+		}
+	}
+
 	// 清理空目录
 	cleanupEmptyDirs(absStorageDir)
 
@@ -400,6 +410,110 @@ func getDiskUsage(path string) (float64, error) {
 
 	usage := float64(used) / float64(total) * 100
 	return usage, nil
+}
+
+// getAbsStorageDir 返回录像存储目录的绝对路径
+func (c Core) getAbsStorageDir() string {
+	storageDir := c.conf.StorageDir
+	if storageDir == "" {
+		storageDir = "./recordings"
+	}
+	return filepath.Join(system.Getwd(), storageDir)
+}
+
+// dateDirEntry 文件系统上发现的日期目录
+type dateDirEntry struct {
+	path string
+	date time.Time
+}
+
+// scanDateDirs 递归扫描录像目录树，收集所有 YYYY-MM-DD 格式的日期目录
+func scanDateDirs(root string) []dateDirEntry {
+	var result []dateDirEntry
+	var scan func(dir string)
+	scan = func(dir string) {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			t, err := time.Parse("2006-01-02", e.Name())
+			if err != nil {
+				scan(filepath.Join(dir, e.Name()))
+				continue
+			}
+			result = append(result, dateDirEntry{
+				path: filepath.Join(dir, e.Name()),
+				date: t,
+			})
+		}
+	}
+	scan(root)
+	return result
+}
+
+// cleanupOrphanDirs 按保留天数扫描文件系统，删除超龄的日期目录
+// 作为数据库清理的兜底：即使录像记录不在数据库中，
+// 只要日期目录超龄就会被清理，避免孤儿文件无限累积
+func (c Core) cleanupOrphanDirs() {
+	if c.conf.RetainDays <= 0 {
+		return
+	}
+
+	absStorageDir := c.getAbsStorageDir()
+	if _, err := os.Stat(absStorageDir); os.IsNotExist(err) {
+		return
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -c.conf.RetainDays)
+	dirs := scanDateDirs(absStorageDir)
+
+	var removedCount int
+	for _, d := range dirs {
+		if !d.date.Before(cutoff) {
+			continue
+		}
+		if err := os.RemoveAll(d.path); err != nil {
+			slog.Warn("删除过期日期目录失败", "path", d.path, "err", err)
+			continue
+		}
+		removedCount++
+		slog.Info("删除过期日期目录", "path", d.path, "date", d.date.Format("2006-01-02"))
+	}
+	if removedCount > 0 {
+		slog.Info("过期目录清理完成", "removed_dirs", removedCount)
+		cleanupEmptyDirs(absStorageDir)
+	}
+}
+
+// cleanupDiskByFilesystem 文件系统级磁盘清理兜底
+// 当数据库中已无可删录像但磁盘仍超标时，直接按日期目录从旧到新逐个删除
+func (c Core) cleanupDiskByFilesystem(absStorageDir string) {
+	dirs := scanDateDirs(absStorageDir)
+	if len(dirs) == 0 {
+		return
+	}
+
+	slices.SortFunc(dirs, func(a, b dateDirEntry) int {
+		return a.date.Compare(b.date)
+	})
+
+	slog.Info("数据库无可删录像，启动文件系统级磁盘清理", "date_dirs", len(dirs))
+	for _, d := range dirs {
+		usage, err := getDiskUsage(absStorageDir)
+		if err != nil || usage < c.conf.DiskUsageThreshold {
+			break
+		}
+		if err := os.RemoveAll(d.path); err != nil {
+			slog.Warn("文件系统磁盘清理: 删除目录失败", "path", d.path, "err", err)
+			continue
+		}
+		slog.Info("文件系统磁盘清理: 删除目录", "path", d.path, "date", d.date.Format("2006-01-02"))
+	}
+	cleanupEmptyDirs(absStorageDir)
 }
 
 // cleanupEmptyDirs 递归删除空目录

@@ -308,14 +308,14 @@ func (w WebHookAPI) onRecordMP4(c *gin.Context, in *onRecordMP4Input) (DefaultOu
 	)
 
 	// 计算相对路径：从配置的存储目录开始
+	// filepath.Clean 去除 "./" 前缀，避免 storageDir="./configs/recordings"
+	// 与 ZLM 回调的绝对路径 "/opt/.../configs/recordings/..." 匹配失败
 	relativePath := in.FilePath
 	if w.conf.Server.Recording.StorageDir != "" {
-		// 尝试提取相对路径
-		storageDir := w.conf.Server.Recording.StorageDir
+		storageDir := filepath.Clean(w.conf.Server.Recording.StorageDir)
 		if idx := strings.Index(in.FilePath, storageDir); idx >= 0 {
 			relativePath = in.FilePath[idx:]
 		} else {
-			// 使用 URL 字段作为相对路径
 			relativePath = in.URL
 		}
 	}
