@@ -11,20 +11,38 @@ type Storer interface {
 	Channel() ChannelStorer
 }
 
+// CoverManager 快照文件清理接口，通道删除时由 Core 自动调用。
+type CoverManager interface {
+	Remove(channelID string)
+}
+
+// Option 用于配置 Core 的可选参数。
+type Option func(*Core)
+
+// WithCoverManager 注入快照管理器，通道删除时自动清理快照文件。
+func WithCoverManager(cm CoverManager) Option {
+	return func(c *Core) { c.coverManager = cm }
+}
+
 // Core business domain
 type Core struct {
-	store     Storer
-	uniqueID  uniqueid.Core
-	protocols map[string]Protocoler // 协议映射（Protocol 在同一个包内）
+	store        Storer
+	uniqueID     uniqueid.Core
+	protocols    map[string]Protocoler // 协议映射（Protocol 在同一个包内）
+	coverManager CoverManager
 }
 
 // NewCore create business domain
-func NewCore(store Storer, uni uniqueid.Core, protocols map[string]Protocoler) Core {
-	return Core{
+func NewCore(store Storer, uni uniqueid.Core, protocols map[string]Protocoler, opts ...Option) Core {
+	c := Core{
 		store:     store,
 		uniqueID:  uni,
 		protocols: protocols,
 	}
+	for _, opt := range opts {
+		opt(&c)
+	}
+	return c
 }
 
 func (c Core) GetProtocol(atype string) Protocoler {

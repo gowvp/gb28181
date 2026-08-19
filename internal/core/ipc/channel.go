@@ -258,7 +258,7 @@ func mergeStreamConfig(dst, src StreamConfig) StreamConfig {
 }
 
 // DeleteChannel Delete object
-// 删除通道后会自动扣减所属设备的通道计数
+// 删除通道后会自动扣减所属设备的通道计数，并清理关联快照。
 func (c Core) DeleteChannel(ctx context.Context, id string) (*Channel, error) {
 	var out Channel
 	if err := c.store.Channel().Delete(ctx, &out, orm.Where("id=?", id)); err != nil {
@@ -278,6 +278,9 @@ func (c Core) DeleteChannel(ctx context.Context, id string) (*Channel, error) {
 		}
 	}
 
+	if c.coverManager != nil {
+		go c.coverManager.Remove(id)
+	}
 	return &out, nil
 }
 

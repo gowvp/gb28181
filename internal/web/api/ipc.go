@@ -35,32 +35,40 @@ const (
 	coverDir = "cover"
 )
 
-// TODO: 快照不会删除，只会覆盖，设备删除时也不会删除快照，待实现
-func writeCover(dataDir, channelID string, body []byte) error {
-	coverPath := filepath.Join(dataDir, coverDir)
-	if err := os.MkdirAll(coverPath, 0o777); err != nil {
+// coverFileManager 实现 ipc.CoverManager 接口，基于文件系统管理快照。
+type coverFileManager struct {
+	dataDir string
+}
+
+func (m *coverFileManager) Write(channelID string, data []byte) error {
+	dir := filepath.Join(m.dataDir, coverDir)
+	if err := os.MkdirAll(dir, 0o777); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(coverPath, channelID+".jpg"), body, 0o644)
+	return os.WriteFile(filepath.Join(dir, channelID+".jpg"), data, 0o644)
 }
 
-func readCoverPath(dataDir, channelID string) string {
-	coverPath := filepath.Join(dataDir, coverDir)
-	return filepath.Join(coverPath, channelID+".jpg")
+func (m *coverFileManager) ReadPath(channelID string) string {
+	return filepath.Join(m.dataDir, coverDir, channelID+".jpg")
 }
 
-func readCover(dataDir, channelID string) ([]byte, error) {
-	return os.ReadFile(readCoverPath(dataDir, channelID))
+func (m *coverFileManager) Read(channelID string) ([]byte, error) {
+	return os.ReadFile(m.ReadPath(channelID))
+}
+
+func (m *coverFileManager) Remove(channelID string) {
+	_ = os.Remove(filepath.Join(m.dataDir, coverDir, channelID+".jpg"))
 }
 
 type IPCAPI struct {
 	ipc           ipc.Core
 	uc            *Usecase
 	recordingCore recording.Core
+	cover         *coverFileManager
 }
 
 func NewIPCAPI(bundle IPCBundle, recordingCore recording.Core) IPCAPI {
-	return IPCAPI{ipc: bundle.Core, recordingCore: recordingCore}
+	return IPCAPI{ipc: bundle.Core, recordingCore: recordingCore, cover: bundle.cover}
 }
 
 // deviceIDInput 设备 ID 路径参数
@@ -353,11 +361,9 @@ func (a IPCAPI) createChannel(c *gin.Context, in *ipc.AddChannelInput) (any, err
 
 // deleteChannel 删除 RTMP/RTSP 通道
 func (a IPCAPI) deleteChannel(c *gin.Context, in *channelIDInput) (any, error) {
-	// 仅允许删除 RTMP/RTSP 类型通道
 	if !bz.IsRTMP(in.ID) && !bz.IsRTSP(in.ID) {
 		return nil, reason.ErrBadRequest.WithMsg("仅支持删除 RTMP/RTSP 类型通道")
 	}
-
 	return a.ipc.DeleteChannel(c.Request.Context(), in.ID)
 }
 
@@ -483,7 +489,7 @@ func (a IPCAPI) play(c *gin.Context, in *channelIDInput) (*playOutput, error) {
 				slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)
 				continue
 			}
-			if err := writeCover(a.uc.Conf.ConfigDir, channelID, body); err != nil {
+			if err := a.cover.Write(channelID, body); err != nil {
 				slog.ErrorContext(c.Request.Context(), "write cover", "err", err)
 			}
 			break
@@ -640,7 +646,7 @@ type refreshSnapshotInput struct {
 func (a IPCAPI) refreshSnapshot(c *gin.Context, in *refreshSnapshotWithIDInput) (any, error) {
 	channelID := in.ID
 
-	path := readCoverPath(a.uc.Conf.ConfigDir, channelID)
+	path := a.cover.ReadPath(channelID)
 
 	token := c.GetString("token")
 
@@ -673,10 +679,9 @@ func (a IPCAPI) refreshSnapshot(c *gin.Context, in *refreshSnapshotWithIDInput) 
 		})
 		if err != nil {
 			slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)
-			// return nil, reason.ErrBadRequest.Msg(err.Error())
 		} else {
 			if hook.MD5FromBytes(img) != "" {
-				if err := writeCover(a.uc.Conf.ConfigDir, channelID, img); err != nil {
+				if err := a.cover.Write(channelID, img); err != nil {
 					slog.ErrorContext(c.Request.Context(), "write cover", "err", err)
 				}
 			}
@@ -735,11 +740,12 @@ func (a IPCAPI) deleteZone(c *gin.Context, in *deleteZoneInput) (gin.H, error) {
 
 func (a IPCAPI) getSnapshot(c *gin.Context) {
 	channelID := c.Param("id")
-	body, err := readCover(a.uc.Conf.ConfigDir, channelID)
+	body, err := a.cover.Read(channelID)
 	if err != nil {
 		web.Fail(c, reason.ErrNotFound.WithMsg(err.Error()))
 		return
 	}
+	c.Header("Cache-Control", "public, max-age=300")
 	c.Data(200, "image/jpeg", body)
 }
 

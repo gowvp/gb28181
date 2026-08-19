@@ -174,10 +174,21 @@ func (c Core) UpdateDevice(ctx context.Context, in *EditDeviceInput, id string) 
 }
 
 // DeleteDevice Delete object
+// 删除设备时同步删除其下所有通道，并清理关联快照。
 func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
 	var dev Device
 	if err := c.store.Device().Delete(ctx, &dev, orm.Where("id=?", id)); err != nil {
 		return nil, reason.ErrDB.Withf(`Delete err[%s]`, err.Error())
+	}
+
+	// 删除前收集通道 ID 用于快照清理
+	var channelIDs []string
+	if c.coverManager != nil {
+		var channels []*Channel
+		c.store.Channel().List(ctx, &channels, web.NewPagerFilterMaxSize(), orm.Where("did=?", id))
+		for _, ch := range channels {
+			channelIDs = append(channelIDs, ch.ID)
+		}
 	}
 
 	if err := c.store.Channel().Session(ctx, func(tx *gorm.DB) error {
@@ -196,6 +207,13 @@ func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
 		return nil, reason.ErrDB.Withf(`DeleteChannel err[%s]`, err.Error())
 	}
 
+	if c.coverManager != nil && len(channelIDs) > 0 {
+		go func() {
+			for _, cid := range channelIDs {
+				c.coverManager.Remove(cid)
+			}
+		}()
+	}
 	return &dev, nil
 }
 

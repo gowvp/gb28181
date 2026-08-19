@@ -157,6 +157,7 @@ func NewGBAdapter(store ipc.Storer, uni uniqueid.Core) ipc.Adapter {
 type IPCBundle struct {
 	Core      ipc.Core
 	Protocols map[string]ipc.Protocoler
+	cover     *coverFileManager
 }
 
 // NewIPCCoreWithProtocols 创建 IPC Core 和 Protocols
@@ -173,11 +174,13 @@ func NewIPCCoreWithProtocols(store ipc.Storer, uni uniqueid.Core, adapter ipc.Ad
 	protocols[ipc.TypeGB28181] = gbadapter.NewAdapter(adapter, gbsServer, smsCore)
 
 	// 第三步：创建含 protocols 的最终 Core
-	core := ipc.NewCore(store, uni, protocols)
+	cm := &coverFileManager{dataDir: conf.ConfigDir}
+	core := ipc.NewCore(store, uni, protocols, ipc.WithCoverManager(cm))
 
 	return IPCBundle{
 		Core:      core,
 		Protocols: protocols,
+		cover:     cm,
 	}
 }
 
