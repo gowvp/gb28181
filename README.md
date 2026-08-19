@@ -276,11 +276,12 @@ If you're a Go developer familiar with Docker, you can download the source code 
 - [x] Chinese and English language support
 
 **OWL PRO**
-
-- [x] 分屏预览
-- [x] 分屏卡存录像回放(摄像头内置录像)
-- [x] 主子码流
-- [x] 自研 owl 播放器，兼容不同环境的 H265 流播放(仅支持 FLV 协议)
+- [x] Multi-screen split preview
+- [x] Multi-screen SD card recording playback (camera built-in recording)
+- [x] Recording file download
+- [x] Remote device reboot
+- [x] Main and sub stream switching
+- [x] Proprietary owl player with broad H265 stream playback compatibility (FLV only)
 
 ## ONVIF Virtual Device (Server)
 
