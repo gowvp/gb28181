@@ -7,6 +7,8 @@ import (
 	"unsafe"
 )
 
+const txIdleTimeout = 20 * time.Second
+
 var activeTX *transacionts
 
 type transacionts struct {
@@ -44,6 +46,7 @@ type Transaction struct {
 	key    string
 	resp   chan *Response
 	active chan int
+	once   sync.Once
 }
 
 // NewTransaction NewTransaction
@@ -60,13 +63,25 @@ func (tx *Transaction) Key() string {
 }
 
 func (tx *Transaction) watch() {
+	timer := time.NewTimer(txIdleTimeout)
+	defer timer.Stop()
 	for {
 		select {
-		case <-tx.active:
-			// logrus.Traceln("active tx", tx.Key(), time.Now().Format("2006-01-02 15:04:05"))
-		case <-time.After(20 * time.Second):
+		case _, ok := <-tx.active:
+			// Close() 关闭 active 后必须退出；否则已关闭 channel 会让 select
+			// 立刻命中，并在循环里反复创建 time.After，把 CPU 打满。
+			if !ok {
+				return
+			}
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(txIdleTimeout)
+		case <-timer.C:
 			tx.Close()
-			// logrus.Traceln("watch closed tx", tx.key, time.Now().Format("2006-01-02 15:04:05"))
 			return
 		}
 	}
@@ -91,10 +106,13 @@ func (tx *Transaction) GetResponse() *Response {
 
 // Close Close
 func (tx *Transaction) Close() {
-	// logrus.Traceln("closed tx", tx.key, time.Now().Format("2006-01-02 15:04:05"))
-	activeTX.rmTX(tx)
-	close(tx.resp)
-	close(tx.active)
+	tx.once.Do(func() {
+		if activeTX != nil {
+			activeTX.rmTX(tx)
+		}
+		close(tx.resp)
+		close(tx.active)
+	})
 }
 
 // Response Response
