@@ -157,7 +157,6 @@ func NewGBAdapter(store ipc.Storer, uni uniqueid.Core) ipc.Adapter {
 type IPCBundle struct {
 	Core      ipc.Core
 	Protocols map[string]ipc.Protocoler
-	cover     *coverFileManager
 }
 
 // NewIPCCoreWithProtocols 创建 IPC Core 和 Protocols
@@ -180,7 +179,6 @@ func NewIPCCoreWithProtocols(store ipc.Storer, uni uniqueid.Core, adapter ipc.Ad
 	return IPCBundle{
 		Core:      core,
 		Protocols: protocols,
-		cover:     cm,
 	}
 }
 

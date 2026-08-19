@@ -64,11 +64,10 @@ type IPCAPI struct {
 	ipc           ipc.Core
 	uc            *Usecase
 	recordingCore recording.Core
-	cover         *coverFileManager
 }
 
 func NewIPCAPI(bundle IPCBundle, recordingCore recording.Core) IPCAPI {
-	return IPCAPI{ipc: bundle.Core, recordingCore: recordingCore, cover: bundle.cover}
+	return IPCAPI{ipc: bundle.Core, recordingCore: recordingCore}
 }
 
 // deviceIDInput 设备 ID 路径参数
@@ -489,7 +488,7 @@ func (a IPCAPI) play(c *gin.Context, in *channelIDInput) (*playOutput, error) {
 				slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)
 				continue
 			}
-			if err := a.cover.Write(channelID, body); err != nil {
+			if err := a.ipc.Cover().Write(channelID, body); err != nil {
 				slog.ErrorContext(c.Request.Context(), "write cover", "err", err)
 			}
 			break
@@ -646,7 +645,7 @@ type refreshSnapshotInput struct {
 func (a IPCAPI) refreshSnapshot(c *gin.Context, in *refreshSnapshotWithIDInput) (any, error) {
 	channelID := in.ID
 
-	path := a.cover.ReadPath(channelID)
+	path := a.ipc.Cover().ReadPath(channelID)
 
 	token := c.GetString("token")
 
@@ -681,7 +680,7 @@ func (a IPCAPI) refreshSnapshot(c *gin.Context, in *refreshSnapshotWithIDInput) 
 			slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)
 		} else {
 			if hook.MD5FromBytes(img) != "" {
-				if err := a.cover.Write(channelID, img); err != nil {
+				if err := a.ipc.Cover().Write(channelID, img); err != nil {
 					slog.ErrorContext(c.Request.Context(), "write cover", "err", err)
 				}
 			}
@@ -740,7 +739,7 @@ func (a IPCAPI) deleteZone(c *gin.Context, in *deleteZoneInput) (gin.H, error) {
 
 func (a IPCAPI) getSnapshot(c *gin.Context) {
 	channelID := c.Param("id")
-	body, err := a.cover.Read(channelID)
+	body, err := a.ipc.Cover().Read(channelID)
 	if err != nil {
 		web.Fail(c, reason.ErrNotFound.WithMsg(err.Error()))
 		return

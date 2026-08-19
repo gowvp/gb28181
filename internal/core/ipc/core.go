@@ -11,8 +11,11 @@ type Storer interface {
 	Channel() ChannelStorer
 }
 
-// CoverManager 快照文件清理接口，通道删除时由 Core 自动调用。
+// CoverManager 快照文件管理接口，Core 内部调用 Remove，外部通过 Cover() 获取完整能力。
 type CoverManager interface {
+	Write(channelID string, data []byte) error
+	ReadPath(channelID string) string
+	Read(channelID string) ([]byte, error)
 	Remove(channelID string)
 }
 
@@ -47,6 +50,11 @@ func NewCore(store Storer, uni uniqueid.Core, protocols map[string]Protocoler, o
 
 func (c Core) GetProtocol(atype string) Protocoler {
 	return c.protocols[atype]
+}
+
+// Cover 返回快照管理器，外部通过此方法读写快照。
+func (c Core) Cover() CoverManager {
+	return c.coverManager
 }
 
 // getProtocolKeys 获取所有可用的协议类型键名（用于调试）
