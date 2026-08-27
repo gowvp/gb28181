@@ -6,73 +6,38 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/gowvp/owl/internal/core/bz"
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/reason"
-	"gorm.io/gorm"
 )
 
 // ChannelStorer Instantiation interface
 type ChannelStorer interface {
-	List(context.Context, *[]*Channel, orm.Pager, ...orm.QueryOption) (int64, error)
-	Get(context.Context, *Channel, ...orm.QueryOption) error
+	WithTx(orm.Tx) (ChannelStorer, error)
 	Create(context.Context, *Channel) error
-	Update(context.Context, *Channel, func(*Channel) error, ...orm.QueryOption) error
-	Delete(context.Context, *Channel, ...orm.QueryOption) error
+	Update(context.Context, *Channel, func(*Channel) error) error
+	Delete(context.Context, *Channel) error
+	List(context.Context, *[]*Channel, *FindChannelInput) (int64, error)
+	GetByID(ctx context.Context, id string) (*Channel, error)
 
-	BatchEdit(context.Context, string, any, ...orm.QueryOption) error // 批量更新一个字段
-	EditGB28181Config(context.Context, *Channel) error                // 直接更新 GB28181 上报的四个字段，跳过查询
-	Session(ctx context.Context, changeFns ...func(*gorm.DB) error) error
+	GetByAppStream(ctx context.Context, app, stream string) (*Channel, error)
+	GetByStream(ctx context.Context, stream string) (*Channel, error)
+	GetByDeviceIDAndChannelID(ctx context.Context, deviceID, channelID string) (*Channel, error)
+
+	BatchOfflineByDID(ctx context.Context, did string) error
+	BatchOfflineByType(ctx context.Context, typ string) error
+	BatchOfflineByDeviceID(ctx context.Context, deviceID string, excludeChannelIDs []string) error
+	DeleteByDID(ctx context.Context, did string) error
+	EditGB28181Config(context.Context, *Channel) error
 }
 
 // ListChannels Paginated search
 func (c Core) ListChannels(ctx context.Context, in *FindChannelInput) ([]*Channel, int64, error) {
 	items := make([]*Channel, 0)
 
-	query := orm.NewQuery(1)
-	query.OrderBy("channel_id,created_at DESC")
-
-	switch true {
-	case in.DID != "":
-		query.Where("did=?", in.DID)
-	case in.DeviceID != "":
-		query.Where("device_id = ?", in.DeviceID)
-	}
-	if in.Key != "" {
-		if strings.HasPrefix(in.Key, bz.IDPrefixGBChannel) ||
-			strings.HasPrefix(in.Key, bz.IDPrefixRTMP) ||
-			strings.HasPrefix(in.Key, bz.IDPrefixRTSP) {
-			query.Where("id=?", in.Key)
-		} else {
-			query.Where("channel_id like ? OR name like ? OR app like ? OR stream like ?",
-				"%"+in.Key+"%", "%"+in.Key+"%", "%"+in.Key+"%", "%"+in.Key+"%")
-		}
-	}
-
-	if in.IsOnline == "true" || in.IsOnline == "false" {
-		isOnline, _ := strconv.ParseBool(in.IsOnline)
-		query.Where("is_online = ?", isOnline)
-	}
-
-	// 按类型过滤
-	if in.Type != "" {
-		query.Where("type = ?", in.Type)
-	}
-
-	// 按 app 过滤
-	if in.App != "" {
-		query.Where("app = ?", in.App)
-	}
-
-	// 按 stream 过滤
-	if in.Stream != "" {
-		query.Where("stream = ?", in.Stream)
-	}
-
-	total, err := c.store.Channel().List(ctx, &items, in, query.Encode()...)
+	total, err := c.store.Channel().List(ctx, &items, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}
@@ -81,14 +46,14 @@ func (c Core) ListChannels(ctx context.Context, in *FindChannelInput) ([]*Channe
 
 // GetChannel Query a single object
 func (c Core) GetChannel(ctx context.Context, id string) (*Channel, error) {
-	var out Channel
-	if err := c.store.Channel().Get(ctx, &out, orm.Where("id=?", id)); err != nil {
+	out, err := c.store.Channel().GetByID(ctx, id)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Get err[%s]`, err.Error())
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
-	return &out, nil
+	return out, nil
 }
 
 // CreateChannel 添加 RTMP/RTSP 通道，支持自动创建虚拟设备
@@ -116,8 +81,8 @@ func (c Core) CreateChannel(ctx context.Context, in *AddChannelInput) (*Channel,
 	// 设备处理逻辑
 	if in.DeviceID != "" {
 		// 有 device_id，检查设备是否存在
-		var dev Device
-		if err := c.store.Device().Get(ctx, &dev, orm.Where("id=?", in.DeviceID)); err != nil {
+		dev, err := c.store.Device().GetByID(ctx, in.DeviceID)
+		if err != nil {
 			if orm.IsErrRecordNotFound(err) {
 				return nil, reason.ErrNotFound.WithMsg("设备不存在")
 			}
@@ -179,11 +144,11 @@ func (c Core) CreateChannel(ctx context.Context, in *AddChannelInput) (*Channel,
 
 	// 更新设备的通道计数
 	if needUpdateChannelCount {
-		var dev Device
+		dev := Device{ID: deviceID}
 		if err := c.store.Device().Update(ctx, &dev, func(d *Device) error {
 			d.Channels++
 			return nil
-		}, orm.Where("id=?", deviceID)); err != nil {
+		}); err != nil {
 			slog.WarnContext(ctx, "更新设备通道计数失败", "deviceID", deviceID, "err", err)
 		}
 	}
@@ -210,7 +175,7 @@ func (c Core) UpdateChannel(ctx context.Context, in *EditChannelInput, id string
 		return nil, reason.ErrBadRequest.WithMsg("app=rtp 为 GB28181 专用，RTMP/RTSP 不可使用")
 	}
 
-	var out Channel
+	out := Channel{ID: id}
 	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
 		if in.Name != "" {
 			b.Name = in.Name
@@ -229,7 +194,7 @@ func (c Core) UpdateChannel(ctx context.Context, in *EditChannelInput, id string
 		}
 		b.Config = mergeStreamConfig(b.Config, in.Config)
 		return nil
-	}, orm.Where("id=?", id)); err != nil {
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
 	return &out, nil
@@ -260,20 +225,20 @@ func mergeStreamConfig(dst, src StreamConfig) StreamConfig {
 // DeleteChannel Delete object
 // 删除通道后会自动扣减所属设备的通道计数，并清理关联快照。
 func (c Core) DeleteChannel(ctx context.Context, id string) (*Channel, error) {
-	var out Channel
-	if err := c.store.Channel().Delete(ctx, &out, orm.Where("id=?", id)); err != nil {
+	out := Channel{ID: id}
+	if err := c.store.Channel().Delete(ctx, &out); err != nil {
 		return nil, reason.ErrDB.Withf(`Delete err[%s]`, err.Error())
 	}
 
 	// 更新设备的通道计数（-1）
 	if out.DID != "" {
-		var dev Device
+		dev := Device{ID: out.DID}
 		if err := c.store.Device().Update(ctx, &dev, func(d *Device) error {
 			if d.Channels > 0 {
 				d.Channels--
 			}
 			return nil
-		}, orm.Where("id=?", out.DID)); err != nil {
+		}); err != nil {
 			slog.WarnContext(ctx, "更新设备通道计数失败", "deviceID", out.DID, "err", err)
 		}
 	}
@@ -292,7 +257,7 @@ func (c Core) AddZone(ctx context.Context, in *AddZoneInput, channelID string) (
 		Labels:      in.Labels,
 	}
 
-	var out Channel
+	out := Channel{ID: channelID}
 	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
 		if slices.ContainsFunc(b.Ext.Zones, func(z Zone) bool {
 			return z.Name == in.Name
@@ -302,7 +267,7 @@ func (c Core) AddZone(ctx context.Context, in *AddZoneInput, channelID string) (
 
 		b.Ext.Zones = append(b.Ext.Zones, newZone)
 		return nil
-	}, orm.Where("id=?", channelID)); err != nil {
+	}); err != nil {
 		if reason.IsCustomError(err) {
 			return nil, err
 		}
@@ -313,7 +278,7 @@ func (c Core) AddZone(ctx context.Context, in *AddZoneInput, channelID string) (
 
 // DeleteZone 按名称删除指定区域，返回删除后的区域列表
 func (c Core) DeleteZone(ctx context.Context, channelID, zoneName string) ([]Zone, error) {
-	var out Channel
+	out := Channel{ID: channelID}
 	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
 		idx := slices.IndexFunc(b.Ext.Zones, func(z Zone) bool {
 			return z.Name == zoneName
@@ -323,7 +288,7 @@ func (c Core) DeleteZone(ctx context.Context, channelID, zoneName string) ([]Zon
 		}
 		b.Ext.Zones = slices.Delete(b.Ext.Zones, idx, idx+1)
 		return nil
-	}, orm.Where("id=?", channelID)); err != nil {
+	}); err != nil {
 		if reason.IsCustomError(err) {
 			return nil, err
 		}
@@ -333,8 +298,8 @@ func (c Core) DeleteZone(ctx context.Context, channelID, zoneName string) ([]Zon
 }
 
 func (c Core) GetZones(ctx context.Context, channelID string) ([]Zone, error) {
-	var out Channel
-	if err := c.store.Channel().Get(ctx, &out, orm.Where("id=?", channelID)); err != nil {
+	out, err := c.store.Channel().GetByID(ctx, channelID)
+	if err != nil {
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
 	return out.Ext.Zones, nil
@@ -342,11 +307,11 @@ func (c Core) GetZones(ctx context.Context, channelID string) ([]Zone, error) {
 
 // SetAIEnabled 设置通道的 AI 检测开关状态，同时返回更新后的完整通道信息供调用方使用
 func (c Core) SetAIEnabled(ctx context.Context, channelID string, enabled bool) (*Channel, error) {
-	var out Channel
+	out := Channel{ID: channelID}
 	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
 		b.Ext.EnabledAI = enabled
 		return nil
-	}, orm.Where("id=?", channelID)); err != nil {
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
 	return &out, nil
@@ -354,11 +319,11 @@ func (c Core) SetAIEnabled(ctx context.Context, channelID string, enabled bool) 
 
 // SetRecordMode 设置通道的录像模式，支持 always/ai/none 三种模式
 func (c Core) SetRecordMode(ctx context.Context, channelID string, mode string) (*Channel, error) {
-	var out Channel
+	out := Channel{ID: channelID}
 	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
 		b.Ext.RecordMode = mode
 		return nil
-	}, orm.Where("id=?", channelID)); err != nil {
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
 	return &out, nil
@@ -366,60 +331,56 @@ func (c Core) SetRecordMode(ctx context.Context, channelID string, mode string) 
 
 // GetChannelByAppStream 通过 app 和 stream 获取通道
 func (c Core) GetChannelByAppStream(ctx context.Context, app, stream string) (*Channel, error) {
-	var out Channel
-	if err := c.store.Channel().Get(ctx, &out, orm.Where("app=? AND stream=?", app, stream)); err != nil {
+	out, err := c.store.Channel().GetByAppStream(ctx, app, stream)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Channel not found app[%s] stream[%s]`, app, stream)
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
-	return &out, nil
+	return out, nil
 }
 
 // GetChannelByAppStreamOrID 通过 app+stream 或 id=stream 获取通道
 // 用于 ZLM 回调时识别通道：先按 app+stream 查找，查不到再按 id=stream 查找
 // 支持自定义 app/stream 的 RTMP/RTSP 通道以及使用默认 ID 作为 stream 的旧通道
 func (c Core) GetChannelByAppStreamOrID(ctx context.Context, app, stream string) (*Channel, error) {
-	var out Channel
-	// 先按 app+stream 查找
-	if err := c.store.Channel().Get(ctx, &out, orm.Where("app=? AND stream=?", app, stream)); err == nil {
-		return &out, nil
+	if out, err := c.store.Channel().GetByAppStream(ctx, app, stream); err == nil {
+		return out, nil
 	}
-	// 再按 id=stream 查找（兼容旧逻辑）
-	if err := c.store.Channel().Get(ctx, &out, orm.Where("id=?", stream)); err != nil {
+	out, err := c.store.Channel().GetByID(ctx, stream)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Channel not found app[%s] stream[%s]`, app, stream)
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
-	return &out, nil
+	return out, nil
 }
 
 // GetChannelByStream 通过 stream ID 获取通道
 // 先按 stream 字段查找，找不到再按 ID 查找
 func (c Core) GetChannelByStream(ctx context.Context, stream string) (*Channel, error) {
-	var out Channel
-	// 先按 stream 字段查找
-	if err := c.store.Channel().Get(ctx, &out, orm.Where("stream=?", stream)); err == nil {
-		return &out, nil
+	if out, err := c.store.Channel().GetByStream(ctx, stream); err == nil {
+		return out, nil
 	}
-	// 再按 ID 查找
-	if err := c.store.Channel().Get(ctx, &out, orm.Where("id=?", stream)); err != nil {
+	out, err := c.store.Channel().GetByID(ctx, stream)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Channel not found stream[%s]`, stream)
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
-	return &out, nil
+	return out, nil
 }
 
 // UpdateChannelConfig 更新通道的流配置（用于 Hook 回调更新状态）
 func (c Core) UpdateChannelConfig(ctx context.Context, id string, fn func(*StreamConfig)) (*Channel, error) {
-	var out Channel
+	out := Channel{ID: id}
 	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
 		fn(&b.Config)
 		return nil
-	}, orm.Where("id=?", id)); err != nil {
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
 	return &out, nil
@@ -427,95 +388,103 @@ func (c Core) UpdateChannelConfig(ctx context.Context, id string, fn func(*Strea
 
 // UpdateChannelConfigAndOnline 更新通道的流配置和在线状态
 func (c Core) UpdateChannelConfigAndOnline(ctx context.Context, id string, isOnline bool, fn func(*StreamConfig)) (*Channel, error) {
-	var out Channel
+	out := Channel{ID: id}
 	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
 		b.IsOnline = isOnline
 		fn(&b.Config)
 		return nil
-	}, orm.Where("id=?", id)); err != nil {
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
 	return &out, nil
 }
 
 func (c Core) BatchOfflineRTMP(ctx context.Context) error {
-	return c.store.Channel().BatchEdit(ctx, "is_online", false, orm.Where("type=?", TypeRTMP))
+	return c.store.Channel().BatchOfflineByType(ctx, TypeRTMP)
 }
 
 // UpdateChannelConfigByAppStream 通过 app+stream 更新通道配置
 func (c Core) UpdateChannelConfigByAppStream(ctx context.Context, app, stream string, fn func(*StreamConfig)) (*Channel, error) {
-	var out Channel
-	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
-		fn(&b.Config)
-		return nil
-	}, orm.Where("app=? AND stream=?", app, stream)); err != nil {
+	ch, err := c.store.Channel().GetByAppStream(ctx, app, stream)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Channel not found app[%s] stream[%s]`, app, stream)
 		}
+		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
+	}
+	if err := c.store.Channel().Update(ctx, ch, func(b *Channel) error {
+		fn(&b.Config)
+		return nil
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
-	return &out, nil
+	return ch, nil
 }
 
 // UpdateChannelConfigAndOnlineByAppStream 通过 app+stream 更新通道配置和在线状态
 func (c Core) UpdateChannelConfigAndOnlineByAppStream(ctx context.Context, app, stream string, isOnline bool, fn func(*StreamConfig)) (*Channel, error) {
-	var out Channel
-	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
-		b.IsOnline = isOnline
-		fn(&b.Config)
-		return nil
-	}, orm.Where("app=? AND stream=?", app, stream)); err != nil {
+	ch, err := c.store.Channel().GetByAppStream(ctx, app, stream)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Channel not found app[%s] stream[%s]`, app, stream)
 		}
+		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
+	}
+	if err := c.store.Channel().Update(ctx, ch, func(b *Channel) error {
+		b.IsOnline = isOnline
+		fn(&b.Config)
+		return nil
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
-	return &out, nil
+	return ch, nil
 }
 
 // UpdateChannelPlaying 更新通道播放状态
 // 任何协议的流被播放或停止播放时都需要更新此状态
 func (c Core) UpdateChannelPlaying(ctx context.Context, stream string, isPlaying bool) (*Channel, error) {
-	var out Channel
 	// 先按 stream 字段查找，再按 ID 查找
-	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
-		b.IsPlaying = isPlaying
-		return nil
-	}, orm.Where("stream=?", stream)); err == nil {
-		return &out, nil
-	}
-	if err := c.store.Channel().Update(ctx, &out, func(b *Channel) error {
-		b.IsPlaying = isPlaying
-		return nil
-	}, orm.Where("id=?", stream)); err != nil {
-		if orm.IsErrRecordNotFound(err) {
-			return nil, reason.ErrNotFound.Withf(`Channel not found stream[%s]`, stream)
+	ch, err := c.store.Channel().GetByStream(ctx, stream)
+	if err != nil {
+		ch, err = c.store.Channel().GetByID(ctx, stream)
+		if err != nil {
+			if orm.IsErrRecordNotFound(err) {
+				return nil, reason.ErrNotFound.Withf(`Channel not found stream[%s]`, stream)
+			}
+			return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 		}
+	}
+	if err := c.store.Channel().Update(ctx, ch, func(b *Channel) error {
+		b.IsPlaying = isPlaying
+		return nil
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
-	return &out, nil
+	return ch, nil
 }
 
 // UpdateChannelOnlineAndPlaying 更新通道在线状态和播放状态
 // 流注销时需要同时更新 IsOnline 和 IsPlaying
 func (c Core) UpdateChannelOnlineAndPlaying(ctx context.Context, stream string, isOnline, isPlaying bool) (*Channel, error) {
-	var out Channel
-	editFn := func(b *Channel) error {
+	// 先按 stream 字段查找，再按 ID 查找
+	ch, err := c.store.Channel().GetByStream(ctx, stream)
+	if err != nil {
+		ch, err = c.store.Channel().GetByID(ctx, stream)
+		if err != nil {
+			if orm.IsErrRecordNotFound(err) {
+				return nil, reason.ErrNotFound.Withf(`Channel not found stream[%s]`, stream)
+			}
+			return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
+		}
+	}
+	if err := c.store.Channel().Update(ctx, ch, func(b *Channel) error {
 		b.IsOnline = isOnline
 		b.IsPlaying = isPlaying
 		return nil
-	}
-	// 先按 stream 字段查找，再按 ID 查找
-	if err := c.store.Channel().Update(ctx, &out, editFn, orm.Where("stream=?", stream)); err == nil {
-		return &out, nil
-	}
-	if err := c.store.Channel().Update(ctx, &out, editFn, orm.Where("id=?", stream)); err != nil {
-		if orm.IsErrRecordNotFound(err) {
-			return nil, reason.ErrNotFound.Withf(`Channel not found stream[%s]`, stream)
-		}
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
-	return &out, nil
+	return ch, nil
 }
 
 // PTZControl 云台控制

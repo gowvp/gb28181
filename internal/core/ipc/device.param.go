@@ -7,7 +7,8 @@ import (
 
 type FindDeviceInput struct {
 	web.PagerFilter
-	Key string `form:"key"`
+	Key         string `form:"key"`
+	ExcludeType string `form:"-" json:"-"` // 内部使用，排除指定类型
 	// DeviceID string `form:"device_id"` // 20 位国标编号
 	// Name     string `form:"name"`      // 设备名称
 	// ID       string `form:"id"`

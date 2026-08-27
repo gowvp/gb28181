@@ -30,12 +30,17 @@ func (c *Cache) LoadOrStore(deviceID string, value *gbs.Device) {
 	c.devices.LoadOrStore(deviceID, value)
 }
 
+// Begin 开启事务，透传底层 DB
+func (c *Cache) Begin() (orm.Tx, error) {
+	return c.Storer.Begin()
+}
+
 func (c *Cache) Device() ipc.DeviceStorer {
-	return (*Device)(c)
+	return (*DeviceCache)(c)
 }
 
 func (c *Cache) Channel() ipc.ChannelStorer {
-	return (*Channel)(c)
+	return (*ChannelCache)(c)
 }
 
 func NewCache(store ipc.Storer) *Cache {
@@ -47,16 +52,17 @@ func NewCache(store ipc.Storer) *Cache {
 
 // LoadDeviceToMemory implements gbs.MemoryStorer.
 func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
-	// TODO: 加载 gb28181 设备
 	devices := make([]*ipc.Device, 0, 100)
-	_, err := c.Storer.Device().List(context.TODO(), &devices, web.NewPagerFilterMaxSize(), orm.Where("type != ?", ipc.TypeOnvif))
+	_, err := c.Storer.Device().List(context.TODO(), &devices, &ipc.FindDeviceInput{
+		PagerFilter: web.NewPagerFilterMaxSize(),
+		ExcludeType: ipc.TypeOnvif,
+	})
 	if err != nil {
 		panic(err)
 	}
 
 	for _, d := range devices {
 		if strings.ToLower(d.Transport) == "tcp" {
-			// 通知相关设备/通道离线
 			c.Change(d.GetGB28181DeviceID(), func(d *ipc.Device) error {
 				d.IsOnline = false
 				return nil
@@ -75,7 +81,10 @@ func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
 
 			slog.Debug("load device to memory", "username", d.GetGB28181DeviceID(), "to", dev.To())
 			channels := make([]*ipc.Channel, 0, 8)
-			_, err := c.Storer.Channel().List(context.TODO(), &channels, web.NewPagerFilterMaxSize(), orm.Where("device_id=?", d.GetGB28181DeviceID()))
+			_, err := c.Storer.Channel().List(context.TODO(), &channels, &ipc.FindChannelInput{
+				PagerFilter: web.NewPagerFilterMaxSize(),
+				DeviceID:    d.GetGB28181DeviceID(),
+			})
 			if err != nil {
 				panic(err)
 			}
@@ -92,8 +101,11 @@ func (c *Cache) RangeDevices(fn func(key string, value *gbs.Device) bool) {
 
 // Change implements gbs.MemoryStorer.
 func (c *Cache) Change(deviceID string, changeFn func(*ipc.Device) error, changeFn2 func(*gbs.Device)) error {
-	var dev ipc.Device
-	if err := c.Storer.Device().Update(context.TODO(), &dev, changeFn, orm.Where("device_id=?", deviceID)); err != nil {
+	dev, err := c.Storer.Device().GetByDeviceID(context.TODO(), deviceID)
+	if err != nil {
+		return err
+	}
+	if err := c.Storer.Device().Update(context.TODO(), dev, changeFn); err != nil {
 		return err
 	}
 
@@ -109,7 +121,7 @@ func (c *Cache) Change(deviceID string, changeFn func(*ipc.Device) error, change
 	dev2.Address = dev.Address
 	changeFn2(dev2)
 	if !dev2.IsOnline {
-		if err := c.Storer.Channel().BatchEdit(context.TODO(), "is_online", false, orm.Where("did=?", dev.ID)); err != nil {
+		if err := c.Storer.Channel().BatchOfflineByDID(context.TODO(), dev.ID); err != nil {
 			slog.Error("更新通道离线状态失败", "error", err)
 		}
 	}

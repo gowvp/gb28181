@@ -3,10 +3,12 @@ package ipc
 
 import (
 	"github.com/ixugo/goddd/domain/uniqueid"
+	"github.com/ixugo/goddd/pkg/orm"
 )
 
 // Storer data persistence
 type Storer interface {
+	Begin() (orm.Tx, error)
 	Device() DeviceStorer
 	Channel() ChannelStorer
 }

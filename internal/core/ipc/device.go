@@ -9,30 +9,23 @@ import (
 	"github.com/ixugo/goddd/pkg/reason"
 	"github.com/ixugo/goddd/pkg/web"
 	"github.com/jinzhu/copier"
-	"gorm.io/gorm"
 )
 
 // DeviceStorer Instantiation interface
 type DeviceStorer interface {
-	List(context.Context, *[]*Device, orm.Pager, ...orm.QueryOption) (int64, error)
-	Get(context.Context, *Device, ...orm.QueryOption) error
+	WithTx(orm.Tx) (DeviceStorer, error)
 	Create(context.Context, *Device) error
-	Update(context.Context, *Device, func(*Device) error, ...orm.QueryOption) error
-	Delete(context.Context, *Device, ...orm.QueryOption) error
-
-	Session(ctx context.Context, changeFns ...func(*gorm.DB) error) error
+	Update(context.Context, *Device, func(*Device) error) error
+	Delete(context.Context, *Device) error
+	List(context.Context, *[]*Device, *FindDeviceInput) (int64, error)
+	GetByID(ctx context.Context, id string) (*Device, error)
+	GetByDeviceID(ctx context.Context, deviceID string) (*Device, error)
 }
 
 func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([]*Device, int64, error) {
 	items := make([]*Device, 0, in.Limit())
 
-	query := orm.NewQuery(3)
-	query.OrderBy("created_at DESC")
-	if in.Key != "" {
-		query.Where("device_id LIKE ? OR name LIKE ?", "%"+in.Key+"%", "%"+in.Key+"%")
-	}
-
-	total, err := c.store.Device().List(ctx, &items, in, query.Encode()...)
+	total, err := c.store.Device().List(ctx, &items, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}
@@ -40,11 +33,13 @@ func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([
 	for _, item := range items {
 		const size = 5
 		item.Children = make([]*Channel, 0, size)
-		chQuery := orm.NewQuery(2).OrderBy("created_at ASC").Where("did=?", item.ID)
-		if in.Key != "" {
-			chQuery.Where("channel_id LIKE ? OR name LIKE ?", "%"+in.Key+"%", "%"+in.Key+"%")
+		childInput := &FindChannelInput{
+			PagerFilter: web.PagerFilter{Size: size},
+			DID:         item.ID,
+			Key:         in.Key,
+			OrderBy:     "created_at ASC",
 		}
-		_, err := c.store.Channel().List(ctx, &item.Children, web.PagerFilter{Size: size}, chQuery.Encode()...)
+		_, err := c.store.Channel().List(ctx, &item.Children, childInput)
 		if err != nil {
 			continue
 		}
@@ -63,14 +58,7 @@ func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([
 // ListDevices Paginated search
 func (c Core) ListDevices(ctx context.Context, in *FindDeviceInput) ([]*Device, int64, error) {
 	items := make([]*Device, 0)
-
-	query := orm.NewQuery(3)
-	query.OrderBy("created_at DESC")
-	if in.Key != "" {
-		query.Where("name LIKE ? OR device_id like ? OR id=?", "%"+in.Key+"%", "%"+in.Key+"%", in.Key)
-	}
-
-	total, err := c.store.Device().List(ctx, &items, in, query.Encode()...)
+	total, err := c.store.Device().List(ctx, &items, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}
@@ -79,25 +67,25 @@ func (c Core) ListDevices(ctx context.Context, in *FindDeviceInput) ([]*Device, 
 
 // GetDevice Query a single object
 func (c Core) GetDevice(ctx context.Context, id string) (*Device, error) {
-	var out Device
-	if err := c.store.Device().Get(ctx, &out, orm.Where("id=?", id)); err != nil {
+	out, err := c.store.Device().GetByID(ctx, id)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Get err[%s] id[%s]`, err.Error(), id)
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s] id[%s]`, err.Error(), id)
 	}
-	return &out, nil
+	return out, nil
 }
 
 func (c Core) GetDeviceByDeviceID(ctx context.Context, deviceID string) (*Device, error) {
-	var out Device
-	if err := c.store.Device().Get(ctx, &out, orm.Where("device_id=?", deviceID)); err != nil {
+	out, err := c.store.Device().GetByDeviceID(ctx, deviceID)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Get err[%s]`, err.Error())
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
-	return &out, nil
+	return out, nil
 }
 
 // CreateDevice Insert into database
@@ -145,7 +133,7 @@ func (c Core) CreateDevice(ctx context.Context, in *AddDeviceInput) (*Device, er
 
 // UpdateDevice Update object information
 func (c Core) UpdateDevice(ctx context.Context, in *EditDeviceInput, id string) (*Device, error) {
-	var out Device
+	out := Device{ID: id}
 	if err := c.store.Device().Update(ctx, &out, func(b *Device) error {
 		if err := copier.Copy(b, in); err != nil {
 			slog.ErrorContext(ctx, "Copy", "err", err)
@@ -160,7 +148,7 @@ func (c Core) UpdateDevice(ctx context.Context, in *EditDeviceInput, id string) 
 		}
 
 		return nil
-	}, orm.Where("id=?", id)); err != nil {
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s] id[%s]`, err.Error(), id)
 	}
 
@@ -176,37 +164,56 @@ func (c Core) UpdateDevice(ctx context.Context, in *EditDeviceInput, id string) 
 // DeleteDevice Delete object
 // 删除设备时同步删除其下所有通道，并清理关联快照。
 func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
-	var dev Device
-	if err := c.store.Device().Delete(ctx, &dev, orm.Where("id=?", id)); err != nil {
-		return nil, reason.ErrDB.Withf(`Delete err[%s]`, err.Error())
+	dev, err := c.store.Device().GetByID(ctx, id)
+	if err != nil {
+		if orm.IsErrRecordNotFound(err) {
+			return nil, reason.ErrNotFound.Withf(`Get err[%s]`, err.Error())
+		}
+		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
 
-	// 删除前收集通道 ID 用于快照清理
+	// 收集通道 ID 用于快照清理
 	var channelIDs []string
 	if c.coverManager != nil {
 		var channels []*Channel
-		c.store.Channel().List(ctx, &channels, web.NewPagerFilterMaxSize(), orm.Where("did=?", id))
+		c.store.Channel().List(ctx, &channels, &FindChannelInput{
+			PagerFilter: web.NewPagerFilterMaxSize(),
+			DID:         id,
+		})
 		for _, ch := range channels {
 			channelIDs = append(channelIDs, ch.ID)
 		}
 	}
 
-	if err := c.store.Channel().Session(ctx, func(tx *gorm.DB) error {
-		if err := orm.Delete(tx, &dev, orm.Where("id=?", id)); err != nil {
-			return err
+	// 事务：删除设备 + 删除通道 + 协议清理
+	tx, err := c.store.Begin()
+	if err != nil {
+		return nil, reason.ErrDB.Withf(`Begin err[%s]`, err.Error())
+	}
+	defer tx.Rollback()
+
+	txDevice, _ := c.store.Device().WithTx(tx)
+	txChannel, _ := c.store.Channel().WithTx(tx)
+
+	if err := txDevice.Delete(ctx, dev); err != nil {
+		return nil, reason.ErrDB.Withf(`Delete err[%s]`, err.Error())
+	}
+
+	if protocol, ok := c.protocols[dev.GetType()]; ok {
+		if err := protocol.DeleteDevice(ctx, dev); err != nil {
+			return nil, reason.ErrDB.Withf(`DeleteDevice err[%s]`, err.Error())
 		}
-		if protocol, ok := c.protocols[dev.GetType()]; ok {
-			if err := protocol.DeleteDevice(ctx, &dev); err != nil {
-				return err
-			}
-		}
-		return nil
-	}, func(d *gorm.DB) error {
-		return d.Where("did=?", id).Delete(&Channel{}).Error
-	}); err != nil {
+	}
+
+	if err := txChannel.DeleteByDID(ctx, id); err != nil {
 		return nil, reason.ErrDB.Withf(`DeleteChannel err[%s]`, err.Error())
 	}
 
+	if err := tx.Commit(); err != nil {
+		return nil, reason.ErrDB.Withf(`Commit err[%s]`, err.Error())
+	}
+
+	// 异步清理快照
 	if c.coverManager != nil && len(channelIDs) > 0 {
 		go func() {
 			for _, cid := range channelIDs {
@@ -214,7 +221,7 @@ func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
 			}
 		}()
 	}
-	return &dev, nil
+	return dev, nil
 }
 
 func (c Core) QueryCatalog(ctx context.Context, deviceID string) error {
