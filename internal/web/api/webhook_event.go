@@ -57,7 +57,7 @@ func (w WebHookAPI) onWebhookEvents(c *gin.Context) {
 		}
 	}
 
-	_, err := w.eventCore.CreateEvent(ctx, &event.AddEventInput{
+	_, err := w.eventCore.CreateEvent(ctx, &event.CreateEventInput{
 		DID:       in.DID,
 		CID:       in.CID,
 		StartedAt: in.StartedAt,
@@ -122,7 +122,7 @@ func (w WebHookAPI) handleAIEvents(c *gin.Context) {
 
 	for _, det := range in.Detections {
 		zonesJSON, _ := json.Marshal(det.Box)
-		_, err := w.eventCore.CreateEventAndNotify(ctx, &event.AddEventInput{
+		_, err := w.eventCore.CreateEventAndNotify(ctx, &event.CreateEventInput{
 			DID:       did,
 			CID:       in.CameraID,
 			StartedAt: in.Timestamp,

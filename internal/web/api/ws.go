@@ -2,10 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gowvp/owl/internal/notify"
 	"github.com/ixugo/goddd/pkg/web"
 	"github.com/ixugo/goddd/pkg/ws"
@@ -56,10 +58,10 @@ func registerWS(r *gin.Engine, jwtSecret string) {
 		}
 		claims, err := web.ParseToken(data.Token, jwtSecret)
 		if err != nil {
+			if errors.Is(err, jwt.ErrSignatureInvalid) {
+				return "", fmt.Errorf("expired token")
+			}
 			return "", fmt.Errorf("invalid token")
-		}
-		if err := claims.Valid(); err != nil {
-			return "", fmt.Errorf("token expired")
 		}
 		userID, _ := claims.Data["user_id"].(string)
 		return userID, nil

@@ -13,39 +13,37 @@ import (
 	"github.com/gowvp/owl/internal/conf"
 	"github.com/gowvp/owl/internal/core/event"
 	"github.com/ixugo/goddd/pkg/orm"
-	"gorm.io/gorm"
 )
 
-// stubEventStorer 实现 event.EventStorer 接口，记录 Add 调用次数
+// stubEventStorer 实现 event.EventStorer 接口，记录 Create 调用次数
 type stubEventStorer struct {
 	addCount int
 }
 
-func (s *stubEventStorer) List(context.Context, *[]*event.Event, orm.Pager, ...orm.QueryOption) (int64, error) {
+func (s *stubEventStorer) WithTx(_ orm.Tx) (event.EventStorer, error)               { return s, nil }
+func (s *stubEventStorer) GetByID(_ context.Context, _ int64) (*event.Event, error) { return nil, nil }
+func (s *stubEventStorer) List(_ context.Context, _ *[]*event.Event, _ *event.ListEventInput) (int64, error) {
 	return 0, nil
 }
-func (s *stubEventStorer) Get(context.Context, *event.Event, ...orm.QueryOption) error { return nil }
+
 func (s *stubEventStorer) Create(_ context.Context, _ *event.Event) error {
 	s.addCount++
 	return nil
 }
 
-func (s *stubEventStorer) Update(_ context.Context, _ *event.Event, _ func(*event.Event), _ ...orm.QueryOption) error {
+func (s *stubEventStorer) Update(_ context.Context, _ *event.Event, _ func(*event.Event) error) error {
 	return nil
 }
-
-func (s *stubEventStorer) Delete(_ context.Context, _ *event.Event, _ ...orm.QueryOption) error {
-	return nil
+func (s *stubEventStorer) Delete(_ context.Context, _ *event.Event) error { return nil }
+func (s *stubEventStorer) Count(_ context.Context, _ *event.ListEventInput) (int64, error) {
+	return 0, nil
 }
-func (s *stubEventStorer) Count(context.Context, ...orm.QueryOption) (int64, error)   { return 0, nil }
-func (s *stubEventStorer) Session(_ context.Context, _ ...func(*gorm.DB) error) error { return nil }
-func (s *stubEventStorer) UpdateWithSession(_ *gorm.DB, _ *event.Event, _ func(*event.Event) error, _ ...orm.QueryOption) error {
-	return nil
-}
+func (s *stubEventStorer) BatchDeleteByIDs(_ context.Context, _ []int64) error { return nil }
 
 // stubStorer 实现 event.Storer
 type stubStorer struct{ ev *stubEventStorer }
 
+func (s *stubStorer) Begin() (orm.Tx, error)   { return nil, nil }
 func (s *stubStorer) Event() event.EventStorer { return s.ev }
 
 // makeWebhookEngine 构建仅注册 POST /webhook/events 的测试引擎

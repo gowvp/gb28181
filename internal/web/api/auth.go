@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/ixugo/goddd/pkg/reason"
 	"github.com/ixugo/goddd/pkg/web"
 )
@@ -37,13 +39,11 @@ func AuthMiddleware(secret string, authURL string, handler ...web.HandlerOption)
 		if len(auth) > len(prefix) && strings.EqualFold(auth[:len(prefix)], prefix) {
 			tokenStr := auth[len(prefix):]
 			claims, err := web.ParseToken(tokenStr, secret)
+			if err != nil && errors.Is(err, jwt.ErrSignatureInvalid) {
+				web.AbortWithStatusJSON(c, reason.ErrUnauthorizedToken.WithMsg("无效的 token"))
+				return
+			}
 			if err == nil {
-				// JWT 解析成功，检查有效期
-				if err := claims.Valid(); err != nil {
-					// token 有效但过期，直接返回需要重新登录，不降级到 authURL
-					web.AbortWithStatusJSON(c, reason.ErrUnauthorizedToken.WithMsg("请重新登录"))
-					return
-				}
 				// JWT 鉴权通过
 				c.Set(web.KeyTokenString, auth)
 				for k, v := range claims.Data {
