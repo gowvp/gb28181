@@ -6,10 +6,12 @@ import (
 	"time"
 
 	"github.com/gowvp/owl/internal/conf"
+	"github.com/ixugo/goddd/pkg/orm"
 )
 
-// Storer data persistence
+// Storer 数据持久化聚合接口
 type Storer interface {
+	Begin() (orm.Tx, error)
 	Recording() RecordingStorer
 }
 

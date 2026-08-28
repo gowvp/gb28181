@@ -3,6 +3,7 @@ package recordingdb
 
 import (
 	"github.com/gowvp/owl/internal/core/recording"
+	"github.com/ixugo/goddd/pkg/orm"
 	"gorm.io/gorm"
 )
 
@@ -16,6 +17,11 @@ type DB struct {
 // NewDB instance object
 func NewDB(db *gorm.DB) DB {
 	return DB{db: db}
+}
+
+// Begin 开启事务
+func (d DB) Begin() (orm.Tx, error) {
+	return orm.Begin(d.db)
 }
 
 // Recording Get business instance

@@ -10,7 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// 若不需要实现缓存，可以注释
 var _ recording.RecordingStorer = (*Recording)(nil)
 
 type Recording Cache
@@ -19,59 +18,67 @@ func (c *Recording) cacheKey(key any) string {
 	return fmt.Sprintf("RECORDING:%v", key)
 }
 
-// List implements recording.RecordingStorer.
-func (c *Recording) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*recording.Recording, int64, error) {
-	return c.store.Recording().List(ctx, page, opts...)
+// WithTx 返回使用指定事务的 Store 副本（事务内仅失效缓存，读直连 db）
+func (c *Recording) WithTx(tx orm.Tx) (recording.RecordingStorer, error) {
+	txStore, err := c.store.Recording().WithTx(tx)
+	if err != nil {
+		return nil, err
+	}
+	return &Recording{store: c.store, recording: c.recording, txStore: txStore}, nil
 }
 
-// Get implements recording.RecordingStorer.
-// 注意: 若想走缓存，则 model 的 CacheKey 必须实现且必须存在值
-// 当 CacheKey 为 id 且出现 orm.Where("id=?",id) 时，查询条件会变成
-// SELECT * FROM `users` WHERE `id` = 1 AND `users`.`id` = 1
-// 两个值一样则不会受到影响
-func (c *Recording) Get(ctx context.Context, model *recording.Recording, opts ...orm.QueryOption) error {
+// List 分页查询（不走缓存）
+func (c *Recording) List(ctx context.Context, in *recording.FindRecordingInput) ([]*recording.Recording, int64, error) {
+	return c.getStore().List(ctx, in)
+}
+
+// GetByID 按主键查询，命中缓存则跳过 db
+func (c *Recording) GetByID(ctx context.Context, id int64) (*recording.Recording, error) {
+	var model recording.Recording
+	model.ID = id
 	if model.CacheKey() != "" {
-		if err := c.recording.Get(ctx, c.cacheKey(model.CacheKey()), model); err == nil {
-			return nil
+		if err := c.recording.Get(ctx, c.cacheKey(model.CacheKey()), &model); err == nil {
+			return &model, nil
 		}
 	}
-	if err := c.store.Recording().Get(ctx, model, opts...); err != nil {
-		return err
+	out, err := c.getStore().GetByID(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	c.recording.SetNX(ctx, c.cacheKey(model.CacheKey()), model)
-	return nil
+	c.recording.SetNX(ctx, c.cacheKey(out.CacheKey()), out)
+	return out, nil
 }
 
-// Create implements recording.RecordingStorer.
+// Create 创建
 func (c *Recording) Create(ctx context.Context, model *recording.Recording) error {
-	if err := c.store.Recording().Create(ctx, model); err != nil {
+	if err := c.getStore().Create(ctx, model); err != nil {
 		return err
 	}
 	c.recording.Set(ctx, c.cacheKey(model.CacheKey()), model)
 	return nil
 }
 
-// Update implements recording.RecordingStorer.
-func (c *Recording) Update(ctx context.Context, model *recording.Recording, changeFn func(*recording.Recording), opts ...orm.QueryOption) error {
-	if err := c.store.Recording().Update(ctx, model, changeFn, opts...); err != nil {
+// Update 更新
+func (c *Recording) Update(ctx context.Context, model *recording.Recording, changeFn func(*recording.Recording) error) error {
+	if err := c.getStore().Update(ctx, model, changeFn); err != nil {
 		return err
 	}
 	c.recording.Set(ctx, c.cacheKey(model.CacheKey()), model)
 	return nil
 }
 
-// Delete implements recording.RecordingStorer.
-func (c *Recording) Delete(ctx context.Context, model *recording.Recording, opts ...orm.QueryOption) error {
-	if err := c.store.Recording().Delete(ctx, model, opts...); err != nil {
+// Delete 删除
+func (c *Recording) Delete(ctx context.Context, model *recording.Recording) error {
+	if err := c.getStore().Delete(ctx, model); err != nil {
 		return err
 	}
 	c.recording.Del(ctx, c.cacheKey(model.CacheKey()))
 	return nil
 }
 
-// Count implements recording.RecordingStorer.
-func (c *Recording) Count(ctx context.Context, opts ...orm.QueryOption) (int64, error) {
-	return c.store.Recording().Count(ctx, opts...)
+// Count 统计
+func (c *Recording) Count(ctx context.Context, in *recording.FindRecordingInput) (int64, error) {
+	return c.getStore().Count(ctx, in)
 }
 
 // Session 事务组合
@@ -79,7 +86,10 @@ func (c *Recording) Session(ctx context.Context, changeFns ...func(*gorm.DB) err
 	return c.store.Recording().Session(ctx, changeFns...)
 }
 
-// UpdateWithSession 修改事务
-func (c *Recording) UpdateWithSession(tx *gorm.DB, model *recording.Recording, changeFn func(b *recording.Recording) error, opts ...orm.QueryOption) error {
-	return c.store.Recording().UpdateWithSession(tx, model, changeFn, opts...)
+// getStore 事务内使用 txStore，否则使用 db store
+func (c *Recording) getStore() recording.RecordingStorer {
+	if c.txStore != nil {
+		return c.txStore
+	}
+	return c.store.Recording()
 }

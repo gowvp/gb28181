@@ -7,6 +7,7 @@ import (
 	"github.com/gowvp/owl/internal/core/recording"
 	"github.com/ixugo/goddd/pkg/orm"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var _ recording.RecordingStorer = Recording{}
@@ -19,39 +20,106 @@ func NewRecording(db *gorm.DB) Recording {
 	return Recording{db: db}
 }
 
-// List implements recording.RecordingStorer.
-func (d Recording) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*recording.Recording, int64, error) {
+// WithTx 返回使用指定事务的 Store 副本
+func (d Recording) WithTx(tx orm.Tx) (recording.RecordingStorer, error) {
+	return &Recording{db: orm.GormDB(tx)}, nil
+}
+
+// applyFilters 将 FindRecordingInput 中的筛选条件应用到 db
+func (d Recording) applyFilters(db *gorm.DB, in *recording.FindRecordingInput) *gorm.DB {
+	if in.CID != "" {
+		db = db.Where("cid = ?", in.CID)
+	}
+	if in.App != "" {
+		db = db.Where("app = ?", in.App)
+	}
+	if in.Stream != "" {
+		db = db.Where("stream = ?", in.Stream)
+	}
+	if in.StartMs > 0 && in.EndMs > 0 {
+		db = db.Where("started_at >= ? AND ended_at <= ?", in.StartAt(), in.EndAt())
+	}
+	if in.StartedAtBefore != nil {
+		db = db.Where("started_at < ?", orm.Time{Time: *in.StartedAtBefore})
+	}
+	if in.StartedAtAfter != nil {
+		db = db.Where("started_at >= ?", orm.Time{Time: *in.StartedAtAfter})
+	}
+	if in.EndedAtAfter != nil {
+		db = db.Where("ended_at > ?", orm.Time{Time: *in.EndedAtAfter})
+	}
+	if in.DeleteFlagEq != nil {
+		db = db.Where("delete_flag = ?", *in.DeleteFlagEq)
+	}
+	return db
+}
+
+// List 分页查询
+func (d Recording) List(ctx context.Context, in *recording.FindRecordingInput) ([]*recording.Recording, int64, error) {
+	db := d.applyFilters(d.db.Model(new(recording.Recording)).WithContext(ctx), in)
+	var total int64
+	if err := db.Count(&total).Error; err != nil || total <= 0 {
+		return nil, total, err
+	}
+	if in.OrderBy != "" {
+		db = db.Order(in.OrderBy)
+	}
 	var bs []*recording.Recording
-	total, err := orm.FindWithContext(ctx, d.db, &bs, page, opts...)
-	return bs, total, err
+	return bs, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&bs).Error
 }
 
-// Get implements recording.RecordingStorer.
-func (d Recording) Get(ctx context.Context, model *recording.Recording, opts ...orm.QueryOption) error {
-	return orm.FirstWithContext(ctx, d.db, model, opts...)
+// Count 统计
+func (d Recording) Count(ctx context.Context, in *recording.FindRecordingInput) (int64, error) {
+	db := d.db.Model(new(recording.Recording)).WithContext(ctx)
+	if in != nil {
+		db = d.applyFilters(db, in)
+	}
+	var count int64
+	return count, db.Count(&count).Error
 }
 
-// Create implements recording.RecordingStorer.
+// GetByID 按主键查询单条
+func (d Recording) GetByID(ctx context.Context, id int64) (*recording.Recording, error) {
+	if id == 0 {
+		panic("recording: GetByID called with zero ID")
+	}
+	model := recording.Recording{ID: id}
+	if err := d.db.WithContext(ctx).Take(&model).Error; err != nil {
+		return nil, err
+	}
+	return &model, nil
+}
+
+// Create 创建
 func (d Recording) Create(ctx context.Context, model *recording.Recording) error {
 	return d.db.WithContext(ctx).Create(model).Error
 }
 
-// Update implements recording.RecordingStorer.
-func (d Recording) Update(ctx context.Context, model *recording.Recording, changeFn func(*recording.Recording), opts ...orm.QueryOption) error {
-	return orm.UpdateWithContext(ctx, d.db, model, changeFn, opts...)
+// Update 原子更新：SELECT FOR UPDATE + changeFn + Save
+func (d Recording) Update(ctx context.Context, model *recording.Recording, changeFn func(*recording.Recording) error) error {
+	if model.ID == 0 {
+		panic("recording: Update called with zero ID")
+	}
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Take(model).Error; err != nil {
+			return err
+		}
+		if err := changeFn(model); err != nil {
+			return err
+		}
+		return tx.Save(model).Error
+	})
 }
 
-// Delete implements recording.RecordingStorer.
-func (d Recording) Delete(ctx context.Context, model *recording.Recording, opts ...orm.QueryOption) error {
-	return orm.DeleteWithContext(ctx, d.db, model, opts...)
+// Delete 幂等删除
+func (d Recording) Delete(ctx context.Context, model *recording.Recording) error {
+	if model.ID == 0 {
+		panic("recording: Delete called with zero ID")
+	}
+	return d.db.WithContext(ctx).Clauses(clause.Returning{}).Delete(model).Error
 }
 
-// Count implements recording.RecordingStorer.
-func (d Recording) Count(ctx context.Context, opts ...orm.QueryOption) (int64, error) {
-	return orm.CountWithContext[recording.Recording](ctx, d.db, opts...)
-}
-
-// Session 事务组合
+// Session 事务组合（用于 cleanup/stats 的批量操作）
 func (d Recording) Session(ctx context.Context, changeFns ...func(*gorm.DB) error) error {
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, fn := range changeFns {
@@ -61,9 +129,4 @@ func (d Recording) Session(ctx context.Context, changeFns ...func(*gorm.DB) erro
 		}
 		return nil
 	})
-}
-
-// UpdateWithSession 修改事务
-func (d Recording) UpdateWithSession(tx *gorm.DB, model *recording.Recording, changeFn func(b *recording.Recording) error, opts ...orm.QueryOption) error {
-	return orm.UpdateWithSession(tx, model, changeFn, opts...)
 }

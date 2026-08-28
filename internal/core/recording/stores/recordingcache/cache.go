@@ -4,6 +4,7 @@ package recordingcache
 import (
 	"github.com/gowvp/owl/internal/core/recording"
 	"github.com/ixugo/goddd/pkg/conc"
+	"github.com/ixugo/goddd/pkg/orm"
 )
 
 var _ recording.Storer = (*Cache)(nil)
@@ -18,9 +19,15 @@ func NewCache(store recording.Storer, cache conc.Cacher) *Cache {
 type Cache struct {
 	store     recording.Storer
 	recording conc.Cacher
+	txStore   recording.RecordingStorer // WithTx 时设置，正常为 nil
 }
 
-// Recording implements recording.RecordingStorer
+// Begin 开启事务
+func (c *Cache) Begin() (orm.Tx, error) {
+	return c.store.Begin()
+}
+
+// Recording 获取 RecordingStorer 实例
 func (c *Cache) Recording() recording.RecordingStorer {
 	return (*Recording)(c)
 }

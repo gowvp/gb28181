@@ -1,6 +1,8 @@
 package recording
 
 import (
+	"time"
+
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/web"
 )
@@ -11,6 +13,13 @@ type FindRecordingInput struct {
 	CID    string `form:"cid"`    // 通道 ID (channel.ID)
 	App    string `form:"app"`    // ZLM 应用名
 	Stream string `form:"stream"` // ZLM 流 ID
+
+	// 以下为内部字段，API 层不暴露，供 cleanup/timeline 使用
+	StartedAtBefore *time.Time `form:"-"` // started_at < value
+	StartedAtAfter  *time.Time `form:"-"` // started_at >= value
+	EndedAtAfter    *time.Time `form:"-"` // ended_at > value（timeline 重叠查询）
+	DeleteFlagEq    *bool      `form:"-"` // delete_flag = value
+	OrderBy         string     `form:"-"` // 覆盖默认排序，如 "started_at ASC"
 }
 
 type EditRecordingInput struct {

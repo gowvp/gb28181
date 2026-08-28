@@ -95,7 +95,10 @@ func (c Core) cleanupExpiredRecordings() {
 
 	totalDeleted, filesDeleted, freedBytes, failedFiles := c.batchDeleteRecordings(ctx,
 		"expired",
-		orm.Where("started_at < ?", orm.Time{Time: cutoffTime}),
+		&FindRecordingInput{
+			PagerFilter:     web.PagerFilter{Page: 1, Size: 100},
+			StartedAtBefore: &cutoffTime,
+		},
 	)
 
 	if totalDeleted > 0 || failedFiles > 0 {
@@ -156,10 +159,10 @@ func (c Core) cleanupByDiskUsage() bool {
 		}
 
 		var oldestRecordings []*Recording
-		pager := web.PagerFilter{Page: 1, Size: batchSize}
-		oldestRecordings, _, err = c.store.Recording().List(ctx, &pager,
-			orm.OrderBy("started_at ASC"),
-		)
+		oldestRecordings, _, err = c.store.Recording().List(ctx, &FindRecordingInput{
+			PagerFilter: web.PagerFilter{Page: 1, Size: batchSize},
+			OrderBy:     "started_at ASC",
+		})
 		if err != nil || len(oldestRecordings) == 0 {
 			break
 		}
@@ -286,12 +289,12 @@ func (c Core) markNextDeletionCandidates(ctx context.Context, targetSize int64) 
 		return
 	}
 
-	// 查询未被标记的最旧录像
-	pager := web.PagerFilter{Page: 1, Size: 200}
-	candidates, _, err := c.store.Recording().List(ctx, &pager,
-		orm.Where("delete_flag = ?", false),
-		orm.OrderBy("started_at ASC"),
-	)
+	deleteFlagFalse := false
+	candidates, _, err := c.store.Recording().List(ctx, &FindRecordingInput{
+		PagerFilter:  web.PagerFilter{Page: 1, Size: 200},
+		DeleteFlagEq: &deleteFlagFalse,
+		OrderBy:      "started_at ASC",
+	})
 	if err != nil || len(candidates) == 0 {
 		return
 	}
@@ -317,13 +320,9 @@ func (c Core) markNextDeletionCandidates(ctx context.Context, targetSize int64) 
 
 // batchDeleteRecordings 批量删除录像（文件+数据库记录）
 // 只有文件成功删除（或已不存在）才删数据库记录，避免孤儿文件
-func (c Core) batchDeleteRecordings(ctx context.Context, reason string, conditions ...orm.QueryOption) (totalDeleted, filesDeleted, failedFiles int, freedBytes int64) {
-	batchSize := 100
-
+func (c Core) batchDeleteRecordings(ctx context.Context, reason string, filter *FindRecordingInput) (totalDeleted, filesDeleted, failedFiles int, freedBytes int64) {
 	for {
-		var recordings []*Recording
-		pager := web.PagerFilter{Page: 1, Size: batchSize}
-		recordings, _, err := c.store.Recording().List(ctx, &pager, conditions...)
+		recordings, _, err := c.store.Recording().List(ctx, filter)
 		if err != nil || len(recordings) == 0 {
 			break
 		}
