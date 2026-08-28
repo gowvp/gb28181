@@ -132,8 +132,7 @@ func (g Adapter) SaveChannels(channels []*Channel) error {
 	}
 
 	// 2. 批量查询该设备的所有现有通道
-	var existingChannels []*Channel
-	_, _ = g.store.Channel().List(ctx, &existingChannels, &FindChannelInput{
+	existingChannels, _, _ := g.store.Channel().List(ctx, &FindChannelInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
 		DeviceID:    deviceID,
 	})
@@ -187,10 +186,10 @@ func (g Adapter) SaveChannels(channels []*Channel) error {
 
 // ListDevices 获取所有设备
 func (g Adapter) ListDevices(ctx context.Context) ([]*Device, error) {
-	var devices []*Device
-	if _, err := g.store.Device().List(ctx, &devices, &FindDeviceInput{
+	devices, _, err := g.store.Device().List(ctx, &FindDeviceInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
 	return devices, nil

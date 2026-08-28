@@ -157,7 +157,7 @@ func (c Core) cleanupByDiskUsage() bool {
 
 		var oldestRecordings []*Recording
 		pager := web.PagerFilter{Page: 1, Size: batchSize}
-		_, err := c.store.Recording().List(ctx, &oldestRecordings, &pager,
+		oldestRecordings, _, err = c.store.Recording().List(ctx, &pager,
 			orm.OrderBy("started_at ASC"),
 		)
 		if err != nil || len(oldestRecordings) == 0 {
@@ -287,9 +287,8 @@ func (c Core) markNextDeletionCandidates(ctx context.Context, targetSize int64) 
 	}
 
 	// 查询未被标记的最旧录像
-	var candidates []*Recording
 	pager := web.PagerFilter{Page: 1, Size: 200}
-	_, err := c.store.Recording().List(ctx, &candidates, &pager,
+	candidates, _, err := c.store.Recording().List(ctx, &pager,
 		orm.Where("delete_flag = ?", false),
 		orm.OrderBy("started_at ASC"),
 	)
@@ -324,7 +323,7 @@ func (c Core) batchDeleteRecordings(ctx context.Context, reason string, conditio
 	for {
 		var recordings []*Recording
 		pager := web.PagerFilter{Page: 1, Size: batchSize}
-		_, err := c.store.Recording().List(ctx, &recordings, &pager, conditions...)
+		recordings, _, err := c.store.Recording().List(ctx, &pager, conditions...)
 		if err != nil || len(recordings) == 0 {
 			break
 		}

@@ -20,8 +20,8 @@ func (c *Recording) cacheKey(key any) string {
 }
 
 // List implements recording.RecordingStorer.
-func (c *Recording) List(ctx context.Context, bs *[]*recording.Recording, page orm.Pager, opts ...orm.QueryOption) (int64, error) {
-	return c.store.Recording().List(ctx, bs, page, opts...)
+func (c *Recording) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*recording.Recording, int64, error) {
+	return c.store.Recording().List(ctx, page, opts...)
 }
 
 // Get implements recording.RecordingStorer.

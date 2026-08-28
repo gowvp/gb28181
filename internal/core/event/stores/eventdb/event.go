@@ -63,7 +63,7 @@ func (d EventDB) Delete(ctx context.Context, model *event.Event) error {
 }
 
 // List 分页查询，过滤条件从 ListEventInput 构建
-func (d EventDB) List(ctx context.Context, out *[]*event.Event, in *event.ListEventInput) (int64, error) {
+func (d EventDB) List(ctx context.Context, in *event.ListEventInput) ([]*event.Event, int64, error) {
 	db := d.db.Model(new(event.Event)).WithContext(ctx)
 	if in.CID != "" {
 		db = db.Where("cid = ?", in.CID)
@@ -84,9 +84,10 @@ func (d EventDB) List(ctx context.Context, out *[]*event.Event, in *event.ListEv
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil || total <= 0 {
-		return total, err
+		return nil, total, err
 	}
-	return total, db.Limit(in.Limit()).Offset(in.Offset()).Find(out).Error
+	var out []*event.Event
+	return out, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&out).Error
 }
 
 // Count 统计总数

@@ -12,7 +12,7 @@ import (
 
 // MediaServerStorer Instantiation interface
 type MediaServerStorer interface {
-	List(context.Context, *[]*MediaServer, orm.Pager, ...orm.QueryOption) (int64, error)
+	List(context.Context, orm.Pager, ...orm.QueryOption) ([]*MediaServer, int64, error)
 	Get(context.Context, *MediaServer, ...orm.QueryOption) error
 	Create(context.Context, *MediaServer) error
 	Update(context.Context, *MediaServer, func(*MediaServer), ...orm.QueryOption) error
@@ -21,8 +21,7 @@ type MediaServerStorer interface {
 
 // ListMediaServers Paginated search
 func (c Core) ListMediaServers(ctx context.Context, in *FindMediaServerInput) ([]*MediaServer, int64, error) {
-	items := make([]*MediaServer, 0)
-	total, err := c.storer.MediaServer().List(ctx, &items, in)
+	items, total, err := c.storer.MediaServer().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}

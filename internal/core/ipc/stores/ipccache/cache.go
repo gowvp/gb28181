@@ -57,8 +57,7 @@ func NewCache(store ipc.Storer) *Cache {
 
 // LoadDeviceToMemory implements gbs.MemoryStorer.
 func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
-	devices := make([]*ipc.Device, 0, 100)
-	_, err := c.Storer.Device().List(context.TODO(), &devices, &ipc.FindDeviceInput{
+	devices, _, err := c.Storer.Device().List(context.TODO(), &ipc.FindDeviceInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
 		ExcludeType: ipc.TypeOnvif,
 	})
@@ -85,8 +84,7 @@ func (c *Cache) LoadDeviceToMemory(conn sip.Connection) {
 			}
 
 			slog.Debug("load device to memory", "username", d.GetGB28181DeviceID(), "to", dev.To())
-			channels := make([]*ipc.Channel, 0, 8)
-			_, err := c.Storer.Channel().List(context.TODO(), &channels, &ipc.FindChannelInput{
+			channels, _, err := c.Storer.Channel().List(context.TODO(), &ipc.FindChannelInput{
 				PagerFilter: web.NewPagerFilterMaxSize(),
 				DeviceID:    d.GetGB28181DeviceID(),
 			})

@@ -82,8 +82,8 @@ func (d *DeviceCache) Update(ctx context.Context, dev *ipc.Device, changeFn func
 }
 
 // List implements ipc.DeviceStorer.
-func (d *DeviceCache) List(ctx context.Context, devs *[]*ipc.Device, in *ipc.FindDeviceInput) (int64, error) {
-	return d.store.List(ctx, devs, in)
+func (d *DeviceCache) List(ctx context.Context, in *ipc.FindDeviceInput) ([]*ipc.Device, int64, error) {
+	return d.store.List(ctx, in)
 }
 
 // GetByID implements ipc.DeviceStorer.

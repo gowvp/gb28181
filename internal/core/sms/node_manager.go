@@ -277,8 +277,7 @@ func (n *NodeManager) IsOnline(serverID string) bool {
 
 // listMediaServers Paginated search
 func (n *NodeManager) listMediaServers(ctx context.Context, in *FindMediaServerInput) ([]*MediaServer, int64, error) {
-	items := make([]*MediaServer, 0)
-	total, err := n.storer.MediaServer().List(ctx, &items, in)
+	items, total, err := n.storer.MediaServer().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}

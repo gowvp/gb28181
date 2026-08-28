@@ -48,7 +48,7 @@ func (c Core) cleanupExpiredEvents(days int) {
 			PagerFilter: web.PagerFilter{Page: 1, Size: batchSize},
 			BeforeAt:    cutoffTime,
 		}
-		_, err := c.store.Event().List(ctx, &events, in)
+		events, _, err := c.store.Event().List(ctx, in)
 		if err != nil {
 			slog.Error("failed to query expired events", "err", err)
 			break

@@ -16,7 +16,7 @@ type EventStorer interface {
 	Create(context.Context, *Event) error
 	Update(context.Context, *Event, func(*Event) error) error
 	Delete(context.Context, *Event) error
-	List(context.Context, *[]*Event, *ListEventInput) (int64, error)
+	List(context.Context, *ListEventInput) ([]*Event, int64, error)
 	Count(context.Context, *ListEventInput) (int64, error)
 	GetByID(context.Context, int64) (*Event, error)
 	BatchDeleteByIDs(context.Context, []int64) error
@@ -24,8 +24,7 @@ type EventStorer interface {
 
 // ListEvents 分页查询事件列表，支持按 CID 和时间范围筛选
 func (c Core) ListEvents(ctx context.Context, in *ListEventInput) ([]*Event, int64, error) {
-	items := make([]*Event, 0, in.Limit())
-	total, err := c.store.Event().List(ctx, &items, in)
+	items, total, err := c.store.Event().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf("Find in[%+v] err[%s]", in, err.Error())
 	}

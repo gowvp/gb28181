@@ -12,7 +12,7 @@ import (
 
 // ConfigStorer Instantiation interface
 type ConfigStorer interface {
-	List(context.Context, *[]*Config, orm.Pager, ...orm.QueryOption) (int64, error)
+	List(context.Context, orm.Pager, ...orm.QueryOption) ([]*Config, int64, error)
 	Get(context.Context, *Config, ...orm.QueryOption) error
 	Create(context.Context, *Config) error
 	Update(context.Context, *Config, func(*Config), ...orm.QueryOption) error
@@ -23,8 +23,7 @@ type ConfigStorer interface {
 
 // ListConfigs Paginated search
 func (c Core) ListConfigs(ctx context.Context, in *FindConfigInput) ([]*Config, int64, error) {
-	items := make([]*Config, 0)
-	total, err := c.store.Config().List(ctx, &items, in)
+	items, total, err := c.store.Config().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}

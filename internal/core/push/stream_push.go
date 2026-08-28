@@ -18,15 +18,14 @@ type StreamPushStorer interface {
 	Create(context.Context, *StreamPush) error
 	Update(context.Context, *StreamPush, func(*StreamPush) error) error
 	Delete(context.Context, *StreamPush) error
-	List(context.Context, *[]*StreamPush, *ListStreamPushInput) (int64, error)
+	List(context.Context, *ListStreamPushInput) ([]*StreamPush, int64, error)
 	GetByID(context.Context, string) (*StreamPush, error)
 	GetByAppStream(ctx context.Context, app, stream string) (*StreamPush, error)
 }
 
 // ListStreamPushs 分页查询推流列表
 func (c Core) ListStreamPushs(ctx context.Context, in *ListStreamPushInput) ([]*StreamPush, int64, error) {
-	items := make([]*StreamPush, 0, in.Limit())
-	total, err := c.store.StreamPush().List(ctx, &items, in)
+	items, total, err := c.store.StreamPush().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf("List err[%s]", err.Error())
 	}

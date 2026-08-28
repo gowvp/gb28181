@@ -72,12 +72,13 @@ func (d StreamProxyDB) Delete(ctx context.Context, model *proxy.StreamProxy) err
 }
 
 // List 分页查询
-func (d StreamProxyDB) List(ctx context.Context, out *[]*proxy.StreamProxy, in *proxy.ListStreamProxyInput) (int64, error) {
+func (d StreamProxyDB) List(ctx context.Context, in *proxy.ListStreamProxyInput) ([]*proxy.StreamProxy, int64, error) {
 	db := d.db.Model(new(proxy.StreamProxy)).WithContext(ctx).Order("created_at DESC")
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil || total <= 0 {
-		return total, err
+		return nil, total, err
 	}
-	return total, db.Limit(in.Limit()).Offset(in.Offset()).Find(out).Error
+	var out []*proxy.StreamProxy
+	return out, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&out).Error
 }

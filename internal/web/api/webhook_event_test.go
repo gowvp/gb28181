@@ -22,8 +22,8 @@ type stubEventStorer struct {
 
 func (s *stubEventStorer) WithTx(_ orm.Tx) (event.EventStorer, error)               { return s, nil }
 func (s *stubEventStorer) GetByID(_ context.Context, _ int64) (*event.Event, error) { return nil, nil }
-func (s *stubEventStorer) List(_ context.Context, _ *[]*event.Event, _ *event.ListEventInput) (int64, error) {
-	return 0, nil
+func (s *stubEventStorer) List(_ context.Context, _ *event.ListEventInput) ([]*event.Event, int64, error) {
+	return nil, 0, nil
 }
 
 func (s *stubEventStorer) Create(_ context.Context, _ *event.Event) error {

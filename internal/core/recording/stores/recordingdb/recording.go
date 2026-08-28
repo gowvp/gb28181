@@ -20,8 +20,10 @@ func NewRecording(db *gorm.DB) Recording {
 }
 
 // List implements recording.RecordingStorer.
-func (d Recording) List(ctx context.Context, bs *[]*recording.Recording, page orm.Pager, opts ...orm.QueryOption) (int64, error) {
-	return orm.FindWithContext(ctx, d.db, bs, page, opts...)
+func (d Recording) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*recording.Recording, int64, error) {
+	var bs []*recording.Recording
+	total, err := orm.FindWithContext(ctx, d.db, &bs, page, opts...)
+	return bs, total, err
 }
 
 // Get implements recording.RecordingStorer.

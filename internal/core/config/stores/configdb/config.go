@@ -20,8 +20,10 @@ func NewConfig(db *gorm.DB) Config {
 }
 
 // List implements config.ConfigStorer.
-func (d Config) List(ctx context.Context, bs *[]*config.Config, page orm.Pager, opts ...orm.QueryOption) (int64, error) {
-	return orm.FindWithContext(ctx, d.db, bs, page, opts...)
+func (d Config) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*config.Config, int64, error) {
+	var bs []*config.Config
+	total, err := orm.FindWithContext(ctx, d.db, &bs, page, opts...)
+	return bs, total, err
 }
 
 // Get implements config.ConfigStorer.

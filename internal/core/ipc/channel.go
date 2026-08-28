@@ -19,7 +19,7 @@ type ChannelStorer interface {
 	Create(context.Context, *Channel) error
 	Update(context.Context, *Channel, func(*Channel) error) error
 	Delete(context.Context, *Channel) error
-	List(context.Context, *[]*Channel, *FindChannelInput) (int64, error)
+	List(context.Context, *FindChannelInput) ([]*Channel, int64, error)
 	GetByID(ctx context.Context, id string) (*Channel, error)
 
 	GetByAppStream(ctx context.Context, app, stream string) (*Channel, error)
@@ -35,9 +35,7 @@ type ChannelStorer interface {
 
 // ListChannels Paginated search
 func (c Core) ListChannels(ctx context.Context, in *FindChannelInput) ([]*Channel, int64, error) {
-	items := make([]*Channel, 0)
-
-	total, err := c.store.Channel().List(ctx, &items, in)
+	items, total, err := c.store.Channel().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}

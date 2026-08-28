@@ -17,32 +17,30 @@ type DeviceStorer interface {
 	Create(context.Context, *Device) error
 	Update(context.Context, *Device, func(*Device) error) error
 	Delete(context.Context, *Device) error
-	List(context.Context, *[]*Device, *FindDeviceInput) (int64, error)
+	List(context.Context, *FindDeviceInput) ([]*Device, int64, error)
 	GetByID(ctx context.Context, id string) (*Device, error)
 	GetByDeviceID(ctx context.Context, deviceID string) (*Device, error)
 }
 
 func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([]*Device, int64, error) {
-	items := make([]*Device, 0, in.Limit())
-
-	total, err := c.store.Device().List(ctx, &items, in)
+	items, total, err := c.store.Device().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}
 
 	for _, item := range items {
 		const size = 5
-		item.Children = make([]*Channel, 0, size)
 		childInput := &FindChannelInput{
 			PagerFilter: web.PagerFilter{Size: size},
 			DID:         item.ID,
 			Key:         in.Key,
 			OrderBy:     "created_at ASC",
 		}
-		_, err := c.store.Channel().List(ctx, &item.Children, childInput)
+		children, _, err := c.store.Channel().List(ctx, childInput)
 		if err != nil {
 			continue
 		}
+		item.Children = children
 
 		for _, ch := range item.Children {
 			if !item.IsOnline {
@@ -57,8 +55,7 @@ func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([
 
 // ListDevices Paginated search
 func (c Core) ListDevices(ctx context.Context, in *FindDeviceInput) ([]*Device, int64, error) {
-	items := make([]*Device, 0)
-	total, err := c.store.Device().List(ctx, &items, in)
+	items, total, err := c.store.Device().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`List err[%s]`, err.Error())
 	}
@@ -175,11 +172,11 @@ func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
 	// 收集通道 ID 用于快照清理
 	var channelIDs []string
 	if c.coverManager != nil {
-		var channels []*Channel
-		if _, err := c.store.Channel().List(ctx, &channels, &FindChannelInput{
+		channels, _, err := c.store.Channel().List(ctx, &FindChannelInput{
 			PagerFilter: web.NewPagerFilterMaxSize(),
 			DID:         id,
-		}); err != nil {
+		})
+		if err != nil {
 			// 查询失败时快照清理降级为跳过，不阻断设备删除，但必须留痕以便排查快照残留
 			slog.ErrorContext(ctx, "收集设备通道ID失败，跳过快照清理", "err", err, "device_id", id)
 		}

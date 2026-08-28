@@ -124,8 +124,7 @@ func TestDeviceList(t *testing.T) {
 	seedDevice(t, store, "dev_l3", "on_001", "onvif1", ipc.TypeOnvif)
 
 	// 全量查询
-	var items []*ipc.Device
-	total, err := store.List(ctx, &items, &ipc.FindDeviceInput{PagerFilter: web.NewPagerFilterMaxSize()})
+	_, total, err := store.List(ctx, &ipc.FindDeviceInput{PagerFilter: web.NewPagerFilterMaxSize()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,8 +133,7 @@ func TestDeviceList(t *testing.T) {
 	}
 
 	// ExcludeType
-	var filtered []*ipc.Device
-	total, err = store.List(ctx, &filtered, &ipc.FindDeviceInput{
+	_, total, err = store.List(ctx, &ipc.FindDeviceInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
 		ExcludeType: ipc.TypeOnvif,
 	})
@@ -147,8 +145,7 @@ func TestDeviceList(t *testing.T) {
 	}
 
 	// 关键词搜索
-	var byKey []*ipc.Device
-	total, err = store.List(ctx, &byKey, &ipc.FindDeviceInput{
+	_, total, err = store.List(ctx, &ipc.FindDeviceInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
 		Key:         "onvif",
 	})
@@ -160,8 +157,7 @@ func TestDeviceList(t *testing.T) {
 	}
 
 	// 分页
-	var page1 []*ipc.Device
-	total, err = store.List(ctx, &page1, &ipc.FindDeviceInput{PagerFilter: web.PagerFilter{Size: 2}})
+	page1, total, err := store.List(ctx, &ipc.FindDeviceInput{PagerFilter: web.PagerFilter{Size: 2}})
 	if err != nil {
 		t.Fatal(err)
 	}

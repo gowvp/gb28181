@@ -47,3 +47,4 @@ owl
 .cursor/memory/
 .cursor/scopes/
 graphify-out/
+.CLAUDE.local.md

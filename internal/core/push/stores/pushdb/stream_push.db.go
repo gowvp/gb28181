@@ -72,7 +72,7 @@ func (d StreamPushDB) Delete(ctx context.Context, model *push.StreamPush) error 
 }
 
 // List 分页查询，支持按状态和关键字筛选
-func (d StreamPushDB) List(ctx context.Context, out *[]*push.StreamPush, in *push.ListStreamPushInput) (int64, error) {
+func (d StreamPushDB) List(ctx context.Context, in *push.ListStreamPushInput) ([]*push.StreamPush, int64, error) {
 	db := d.db.Model(new(push.StreamPush)).WithContext(ctx).Order("created_at DESC")
 	if in.Status != "" {
 		db = db.Where("status = ?", in.Status)
@@ -83,7 +83,8 @@ func (d StreamPushDB) List(ctx context.Context, out *[]*push.StreamPush, in *pus
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil || total <= 0 {
-		return total, err
+		return nil, total, err
 	}
-	return total, db.Limit(in.Limit()).Offset(in.Offset()).Find(out).Error
+	var out []*push.StreamPush
+	return out, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&out).Error
 }

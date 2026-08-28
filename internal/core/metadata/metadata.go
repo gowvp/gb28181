@@ -15,7 +15,7 @@ type MetadataStorer interface {
 	Create(context.Context, *Metadata) error
 	Update(context.Context, *Metadata, func(*Metadata) error) error
 	Delete(context.Context, *Metadata) error
-	List(context.Context, *[]*Metadata, *ListMetadataInput) (int64, error)
+	List(context.Context, *ListMetadataInput) ([]*Metadata, int64, error)
 	Count(context.Context, *ListMetadataInput) (int64, error)
 	GetByID(context.Context, string) (*Metadata, error)
 }

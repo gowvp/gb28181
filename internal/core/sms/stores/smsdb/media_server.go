@@ -20,8 +20,10 @@ func NewMediaServer(db *gorm.DB) MediaServer {
 }
 
 // List implements sms.MediaServerStorer.
-func (d MediaServer) List(ctx context.Context, bs *[]*sms.MediaServer, page orm.Pager, opts ...orm.QueryOption) (int64, error) {
-	return orm.FindWithContext(ctx, d.db, bs, page, opts...)
+func (d MediaServer) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*sms.MediaServer, int64, error) {
+	var bs []*sms.MediaServer
+	total, err := orm.FindWithContext(ctx, d.db, &bs, page, opts...)
+	return bs, total, err
 }
 
 // Get implements sms.MediaServerStorer.

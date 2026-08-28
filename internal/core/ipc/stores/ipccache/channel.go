@@ -39,8 +39,8 @@ func (c *ChannelCache) Delete(ctx context.Context, ch *ipc.Channel) error {
 }
 
 // List implements ipc.ChannelStorer.
-func (c *ChannelCache) List(ctx context.Context, chs *[]*ipc.Channel, in *ipc.FindChannelInput) (int64, error) {
-	return c.Storer.Channel().List(ctx, chs, in)
+func (c *ChannelCache) List(ctx context.Context, in *ipc.FindChannelInput) ([]*ipc.Channel, int64, error) {
+	return c.Storer.Channel().List(ctx, in)
 }
 
 // GetByID implements ipc.ChannelStorer.

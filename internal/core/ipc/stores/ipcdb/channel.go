@@ -99,7 +99,7 @@ func (d ChannelDB) Delete(ctx context.Context, model *ipc.Channel) error {
 }
 
 // List 分页查询，过滤条件从 FindChannelInput 构建
-func (d ChannelDB) List(ctx context.Context, out *[]*ipc.Channel, in *ipc.FindChannelInput) (int64, error) {
+func (d ChannelDB) List(ctx context.Context, in *ipc.FindChannelInput) ([]*ipc.Channel, int64, error) {
 	db := d.db.Model(new(ipc.Channel)).WithContext(ctx)
 
 	if in.DID != "" {
@@ -143,9 +143,10 @@ func (d ChannelDB) List(ctx context.Context, out *[]*ipc.Channel, in *ipc.FindCh
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil || total <= 0 {
-		return total, err
+		return nil, total, err
 	}
-	return total, db.Limit(in.Limit()).Offset(in.Offset()).Find(out).Error
+	var out []*ipc.Channel
+	return out, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&out).Error
 }
 
 // EditGB28181Config 直接更新 GB28181 上报的字段，跳过 SELECT FOR UPDATE

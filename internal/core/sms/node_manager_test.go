@@ -30,7 +30,7 @@ func (t *TestMediaServerStorer) Delete(context.Context, *MediaServer, ...orm.Que
 }
 
 // List implements [MediaServerStorer].
-func (t *TestMediaServerStorer) List(context.Context, *[]*MediaServer, orm.Pager, ...orm.QueryOption) (int64, error) {
+func (t *TestMediaServerStorer) List(context.Context, orm.Pager, ...orm.QueryOption) ([]*MediaServer, int64, error) {
 	panic("unimplemented")
 }
 

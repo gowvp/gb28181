@@ -65,8 +65,8 @@ func (c *EventCache) Delete(ctx context.Context, model *event.Event) error {
 }
 
 // List 直接透传底层查询
-func (c *EventCache) List(ctx context.Context, out *[]*event.Event, in *event.ListEventInput) (int64, error) {
-	return c.store.Event().List(ctx, out, in)
+func (c *EventCache) List(ctx context.Context, in *event.ListEventInput) ([]*event.Event, int64, error) {
+	return c.store.Event().List(ctx, in)
 }
 
 // Count 直接透传底层查询

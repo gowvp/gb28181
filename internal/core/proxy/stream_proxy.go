@@ -16,15 +16,14 @@ type StreamProxyStorer interface {
 	Create(context.Context, *StreamProxy) error
 	Update(context.Context, *StreamProxy, func(*StreamProxy) error) error
 	Delete(context.Context, *StreamProxy) error
-	List(context.Context, *[]*StreamProxy, *ListStreamProxyInput) (int64, error)
+	List(context.Context, *ListStreamProxyInput) ([]*StreamProxy, int64, error)
 	GetByID(context.Context, string) (*StreamProxy, error)
 	GetByAppStream(ctx context.Context, app, stream string) (*StreamProxy, error)
 }
 
 // ListStreamProxys 分页查询拉流代理列表
 func (c *Core) ListStreamProxys(ctx context.Context, in *ListStreamProxyInput) ([]*StreamProxy, int64, error) {
-	items := make([]*StreamProxy, 0, in.Limit())
-	total, err := c.store.StreamProxy().List(ctx, &items, in)
+	items, total, err := c.store.StreamProxy().List(ctx, in)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf("List err[%s]", err.Error())
 	}

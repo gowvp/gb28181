@@ -142,8 +142,7 @@ func TestChannelList(t *testing.T) {
 	seedChannel(t, store, "ch_l3", "dev_002", "rtmp1", ipc.TypeRTMP, "push", "s1")
 
 	// 全量查询
-	var items []*ipc.Channel
-	total, err := store.List(ctx, &items, &ipc.FindChannelInput{
+	_, total, err := store.List(ctx, &ipc.FindChannelInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
 	})
 	if err != nil {
@@ -154,8 +153,7 @@ func TestChannelList(t *testing.T) {
 	}
 
 	// 按 DID 过滤
-	var byDID []*ipc.Channel
-	total, err = store.List(ctx, &byDID, &ipc.FindChannelInput{
+	_, total, err = store.List(ctx, &ipc.FindChannelInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
 		DID:         "dev_001",
 	})
@@ -167,8 +165,7 @@ func TestChannelList(t *testing.T) {
 	}
 
 	// 按 type 过滤
-	var byType []*ipc.Channel
-	total, err = store.List(ctx, &byType, &ipc.FindChannelInput{
+	_, total, err = store.List(ctx, &ipc.FindChannelInput{
 		PagerFilter: web.NewPagerFilterMaxSize(),
 		Type:        ipc.TypeRTMP,
 	})
@@ -180,8 +177,7 @@ func TestChannelList(t *testing.T) {
 	}
 
 	// 分页
-	var page1 []*ipc.Channel
-	total, err = store.List(ctx, &page1, &ipc.FindChannelInput{
+	page1, total, err := store.List(ctx, &ipc.FindChannelInput{
 		PagerFilter: web.PagerFilter{Size: 2},
 	})
 	if err != nil {
@@ -235,8 +231,7 @@ func TestChannelDeleteByDID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var items []*ipc.Channel
-	total, _ := store.List(ctx, &items, &ipc.FindChannelInput{PagerFilter: web.NewPagerFilterMaxSize()})
+	items, total, _ := store.List(ctx, &ipc.FindChannelInput{PagerFilter: web.NewPagerFilterMaxSize()})
 	if total != 1 || items[0].ID != "ch_dd_3" {
 		t.Fatalf("expected only ch_dd_3 remaining, got total=%d", total)
 	}

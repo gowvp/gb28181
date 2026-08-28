@@ -14,7 +14,7 @@ import (
 
 // RecordingStorer Instantiation interface
 type RecordingStorer interface {
-	List(context.Context, *[]*Recording, orm.Pager, ...orm.QueryOption) (int64, error)
+	List(context.Context, orm.Pager, ...orm.QueryOption) ([]*Recording, int64, error)
 	Get(context.Context, *Recording, ...orm.QueryOption) error
 	Create(context.Context, *Recording) error
 	Update(context.Context, *Recording, func(*Recording), ...orm.QueryOption) error
@@ -42,8 +42,7 @@ func (c Core) ListRecordings(ctx context.Context, in *FindRecordingInput) ([]*Re
 		query.Where("started_at >= ? AND ended_at <= ?", in.StartAt(), in.EndAt())
 	}
 
-	items := make([]*Recording, 0, in.Limit())
-	total, err := c.store.Recording().List(ctx, &items, in, query.Encode()...)
+	items, total, err := c.store.Recording().List(ctx, in, query.Encode()...)
 	if err != nil {
 		return nil, 0, reason.ErrDB.Withf(`Find in[%+v] err[%s]`, in, err.Error())
 	}
@@ -119,7 +118,7 @@ func (c Core) GetTimeline(ctx context.Context, in *TimelineInput) ([]TimeRange, 
 	var recordings []*Recording
 	// 使用默认分页器避免 nil pointer
 	pager := &defaultPager{limit: 1000}
-	_, err := c.store.Recording().List(ctx, &recordings, pager, query.Encode()...)
+	recordings, _, err := c.store.Recording().List(ctx, pager, query.Encode()...)
 	if err != nil {
 		return nil, reason.ErrDB.Withf(`GetTimeline err[%s]`, err.Error())
 	}
@@ -202,7 +201,7 @@ func (c Core) GetMonthlyStats(ctx context.Context, in *MonthlyStatsInput) (*Mont
 	var recordings []*Recording
 	// 使用默认分页器避免 nil pointer
 	pager := &defaultPager{limit: 10000}
-	_, err := c.store.Recording().List(ctx, &recordings, pager, query.Encode()...)
+	recordings, _, err := c.store.Recording().List(ctx, pager, query.Encode()...)
 	if err != nil {
 		return nil, reason.ErrDB.Withf(`GetMonthlyStats err[%s]`, err.Error())
 	}

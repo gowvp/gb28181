@@ -78,7 +78,7 @@ func (d DeviceDB) Delete(ctx context.Context, model *ipc.Device) error {
 }
 
 // List 分页查询，过滤条件从 FindDeviceInput 构建
-func (d DeviceDB) List(ctx context.Context, out *[]*ipc.Device, in *ipc.FindDeviceInput) (int64, error) {
+func (d DeviceDB) List(ctx context.Context, in *ipc.FindDeviceInput) ([]*ipc.Device, int64, error) {
 	db := d.db.Model(new(ipc.Device)).WithContext(ctx)
 
 	if in.Key != "" {
@@ -92,7 +92,8 @@ func (d DeviceDB) List(ctx context.Context, out *[]*ipc.Device, in *ipc.FindDevi
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil || total <= 0 {
-		return total, err
+		return nil, total, err
 	}
-	return total, db.Limit(in.Limit()).Offset(in.Offset()).Find(out).Error
+	var out []*ipc.Device
+	return out, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&out).Error
 }
