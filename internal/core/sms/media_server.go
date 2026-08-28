@@ -10,16 +10,17 @@ import (
 	"github.com/jinzhu/copier"
 )
 
-// MediaServerStorer Instantiation interface
+// MediaServerStorer 流媒体服务器实体持久化接口
 type MediaServerStorer interface {
-	List(context.Context, orm.Pager, ...orm.QueryOption) ([]*MediaServer, int64, error)
-	Get(context.Context, *MediaServer, ...orm.QueryOption) error
+	WithTx(orm.Tx) (MediaServerStorer, error)
 	Create(context.Context, *MediaServer) error
-	Update(context.Context, *MediaServer, func(*MediaServer), ...orm.QueryOption) error
-	Delete(context.Context, *MediaServer, ...orm.QueryOption) error
+	Update(context.Context, *MediaServer, func(*MediaServer) error) error
+	Delete(context.Context, *MediaServer) error
+	List(context.Context, *FindMediaServerInput) ([]*MediaServer, int64, error)
+	GetByID(context.Context, string) (*MediaServer, error)
 }
 
-// ListMediaServers Paginated search
+// ListMediaServers 分页查询
 func (c Core) ListMediaServers(ctx context.Context, in *FindMediaServerInput) ([]*MediaServer, int64, error) {
 	items, total, err := c.storer.MediaServer().List(ctx, in)
 	if err != nil {
@@ -35,19 +36,19 @@ func (c Core) ListMediaServers(ctx context.Context, in *FindMediaServerInput) ([
 	return items, total, nil
 }
 
-// GetMediaServer Query a single object
+// GetMediaServer 按 ID 查询
 func (c Core) GetMediaServer(ctx context.Context, id string) (*MediaServer, error) {
-	var out MediaServer
-	if err := c.storer.MediaServer().Get(ctx, &out, orm.Where("id=?", id)); err != nil {
+	out, err := c.storer.MediaServer().GetByID(ctx, id)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Get err[%s]`, err.Error())
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
-	return &out, nil
+	return out, nil
 }
 
-// CreateMediaServer Insert into database
+// CreateMediaServer 创建流媒体服务器
 func (c Core) CreateMediaServer(ctx context.Context, in *AddMediaServerInput) (*MediaServer, error) {
 	var out MediaServer
 	if err := copier.Copy(&out, in); err != nil {
@@ -59,35 +60,28 @@ func (c Core) CreateMediaServer(ctx context.Context, in *AddMediaServerInput) (*
 	return &out, nil
 }
 
-// UpdateMediaServer Update object information
+// UpdateMediaServer 更新流媒体服务器
 func (c Core) UpdateMediaServer(ctx context.Context, in *EditMediaServerInput, id string, serverPort int) (*MediaServer, error) {
-	var out MediaServer
-	if err := c.storer.MediaServer().Update(ctx, &out, func(b *MediaServer) {
-		if err := copier.Copy(b, in); err != nil {
-			slog.ErrorContext(ctx, "Copy", "err", err)
-		}
-	}, orm.Where("id=?", id)); err != nil {
+	out := MediaServer{ID: id}
+	if err := c.storer.MediaServer().Update(ctx, &out, func(b *MediaServer) error {
+		return copier.Copy(b, in)
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
 	c.connection(&out, serverPort)
 	return &out, nil
 }
 
-// DeleteMediaServer Delete object
+// DeleteMediaServer 删除流媒体服务器
 func (c Core) DeleteMediaServer(ctx context.Context, id string) (*MediaServer, error) {
-	var out MediaServer
-	if err := c.storer.MediaServer().Delete(ctx, &out, orm.Where("id=?", id)); err != nil {
+	out := MediaServer{ID: id}
+	if err := c.storer.MediaServer().Delete(ctx, &out); err != nil {
 		return nil, reason.ErrDB.Withf(`Delete err[%s]`, err.Error())
 	}
 	return &out, nil
 }
 
-func (c Core) getDefaultMediaServer(ctx context.Context) (*MediaServer, error) {
-	var out MediaServer
-	return &out, c.storer.MediaServer().Get(ctx, &out, orm.Where("id=?", DefaultMediaServerID))
-}
-
 // GetDefaultMediaServer 获取默认流媒体服务器
 func (c Core) GetDefaultMediaServer() (*MediaServer, error) {
-	return c.getDefaultMediaServer(context.Background())
+	return c.storer.MediaServer().GetByID(context.Background(), DefaultMediaServerID)
 }

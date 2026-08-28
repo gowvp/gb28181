@@ -7,6 +7,7 @@ import (
 	"github.com/gowvp/owl/internal/core/sms"
 	"github.com/ixugo/goddd/pkg/orm"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var _ sms.MediaServerStorer = MediaServer{}
@@ -14,49 +15,59 @@ var _ sms.MediaServerStorer = MediaServer{}
 // MediaServer Related business namespaces
 type MediaServer DB
 
-// NewMediaServer instance object
-func NewMediaServer(db *gorm.DB) MediaServer {
-	return MediaServer{db: db}
+// WithTx 返回使用指定事务的 Store 副本
+func (d MediaServer) WithTx(tx orm.Tx) (sms.MediaServerStorer, error) {
+	return &MediaServer{db: orm.GormDB(tx)}, nil
 }
 
-// List implements sms.MediaServerStorer.
-func (d MediaServer) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*sms.MediaServer, int64, error) {
+// List 分页查询
+func (d MediaServer) List(ctx context.Context, in *sms.FindMediaServerInput) ([]*sms.MediaServer, int64, error) {
+	db := d.db.Model(new(sms.MediaServer)).WithContext(ctx)
+	var total int64
+	if err := db.Count(&total).Error; err != nil || total <= 0 {
+		return nil, total, err
+	}
 	var bs []*sms.MediaServer
-	total, err := orm.FindWithContext(ctx, d.db, &bs, page, opts...)
-	return bs, total, err
+	return bs, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&bs).Error
 }
 
-// Get implements sms.MediaServerStorer.
-func (d MediaServer) Get(ctx context.Context, model *sms.MediaServer, opts ...orm.QueryOption) error {
-	return orm.FirstWithContext(ctx, d.db, model, opts...)
+// GetByID 按主键查询单条
+func (d MediaServer) GetByID(ctx context.Context, id string) (*sms.MediaServer, error) {
+	if id == "" {
+		panic("sms: GetByID called with empty ID")
+	}
+	model := sms.MediaServer{ID: id}
+	if err := d.db.WithContext(ctx).Take(&model).Error; err != nil {
+		return nil, err
+	}
+	return &model, nil
 }
 
-// Create implements sms.MediaServerStorer.
+// Create 创建
 func (d MediaServer) Create(ctx context.Context, model *sms.MediaServer) error {
 	return d.db.WithContext(ctx).Create(model).Error
 }
 
-// Update implements sms.MediaServerStorer.
-func (d MediaServer) Update(ctx context.Context, model *sms.MediaServer, changeFn func(*sms.MediaServer), opts ...orm.QueryOption) error {
-	return orm.UpdateWithContext(ctx, d.db, model, changeFn, opts...)
-}
-
-// Delete implements sms.MediaServerStorer.
-func (d MediaServer) Delete(ctx context.Context, model *sms.MediaServer, opts ...orm.QueryOption) error {
-	return orm.DeleteWithContext(ctx, d.db, model, opts...)
-}
-
-func (d MediaServer) Session(ctx context.Context, changeFns ...func(*gorm.DB) error) error {
+// Update 原子更新：SELECT FOR UPDATE + changeFn + Save
+func (d MediaServer) Update(ctx context.Context, model *sms.MediaServer, changeFn func(*sms.MediaServer) error) error {
+	if model.ID == "" {
+		panic("sms: Update called with empty ID")
+	}
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, fn := range changeFns {
-			if err := fn(tx); err != nil {
-				return err
-			}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Take(model).Error; err != nil {
+			return err
 		}
-		return nil
+		if err := changeFn(model); err != nil {
+			return err
+		}
+		return tx.Save(model).Error
 	})
 }
 
-func (d MediaServer) UpdateWithSession(tx *gorm.DB, model *sms.MediaServer, changeFn func(b *sms.MediaServer) error, opts ...orm.QueryOption) error {
-	return orm.UpdateWithSession(tx, model, changeFn, opts...)
+// Delete 幂等删除
+func (d MediaServer) Delete(ctx context.Context, model *sms.MediaServer) error {
+	if model.ID == "" {
+		panic("sms: Delete called with empty ID")
+	}
+	return d.db.WithContext(ctx).Clauses(clause.Returning{}).Delete(model).Error
 }

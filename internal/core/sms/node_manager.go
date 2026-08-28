@@ -154,13 +154,15 @@ func (n *NodeManager) Run(bc *conf.Bootstrap, serverPort int) error {
 		ms.SDPIP = cfg.SDPIP
 	}
 
-	var ms MediaServer
-	if err := n.storer.MediaServer().Update(ctx, &ms, func(b *MediaServer) {
+	ms := MediaServer{ID: DefaultMediaServerID}
+	if err := n.storer.MediaServer().Update(ctx, &ms, func(b *MediaServer) error {
 		setValueFn(b)
-	}, orm.Where("id=?", DefaultMediaServerID)); err != nil {
+		return nil
+	}); err != nil {
 		if !orm.IsErrRecordNotFound(err) {
 			return err
 		}
+		ms = MediaServer{}
 		setValueFn(&ms)
 		if err := n.storer.MediaServer().Create(ctx, &ms); err != nil {
 			return err
@@ -206,13 +208,13 @@ func (n *NodeManager) connection(server *MediaServer, serverPort int) error {
 	}
 	log.Info("MediaServer 连接成功")
 
-	// 更新数据库中的端口信息等
-	if err := n.storer.MediaServer().Update(ctx, &MediaServer{}, func(b *MediaServer) {
-		// 更新字段
+	ms2 := MediaServer{ID: server.ID}
+	if err := n.storer.MediaServer().Update(ctx, &ms2, func(b *MediaServer) error {
 		b.Ports = server.Ports
 		b.HookAliveInterval = server.HookAliveInterval
 		b.Status = server.Status
-	}, orm.Where("id=?", server.ID)); err != nil {
+		return nil
+	}); err != nil {
 		panic(fmt.Errorf("保存 MediaServer 失败 %w", err))
 	}
 
