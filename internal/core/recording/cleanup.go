@@ -468,7 +468,11 @@ func (c Core) cleanupOrphanDirs() {
 		return
 	}
 
-	cutoff := time.Now().AddDate(0, 0, -c.conf.RetainDays)
+	// 目录日期按当日零点解析，cutoff 须同口径截断到本地零点再减保留天数，
+	// 否则保留期边界日的目录几乎恒判超龄，会被提前最多约 24 小时误删
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	cutoff := todayStart.AddDate(0, 0, -c.conf.RetainDays)
 	dirs := scanDateDirs(absStorageDir)
 
 	var removedCount int
