@@ -56,8 +56,13 @@ func (m *coverFileManager) Read(channelID string) ([]byte, error) {
 	return os.ReadFile(m.ReadPath(channelID))
 }
 
-func (m *coverFileManager) Remove(channelID string) {
-	_ = os.Remove(filepath.Join(m.dataDir, coverDir, channelID+".jpg"))
+func (m *coverFileManager) Remove(channelID string) error {
+	// 文件本就不存在视为清理成功，保证删改幂等；其余错误上抛由调用方记录
+	err := os.Remove(filepath.Join(m.dataDir, coverDir, channelID+".jpg"))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 type IPCAPI struct {

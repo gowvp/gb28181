@@ -2,6 +2,8 @@
 package ipc
 
 import (
+	"os"
+
 	"github.com/ixugo/goddd/domain/uniqueid"
 	"github.com/ixugo/goddd/pkg/orm"
 )
@@ -18,8 +20,18 @@ type CoverManager interface {
 	Write(channelID string, data []byte) error
 	ReadPath(channelID string) string
 	Read(channelID string) ([]byte, error)
-	Remove(channelID string)
+	Remove(channelID string) error
 }
+
+// noopCoverManager 未注入快照管理器时的空实现
+// 为什么需要: Cover() 直接返回内部字段，未注入时返回 nil，调用方一旦使用即 panic；
+// 兜底空实现保证 Cover() 返回值永远可用
+type noopCoverManager struct{}
+
+func (noopCoverManager) Write(string, []byte) error  { return nil }
+func (noopCoverManager) ReadPath(string) string      { return "" }
+func (noopCoverManager) Read(string) ([]byte, error) { return nil, os.ErrNotExist }
+func (noopCoverManager) Remove(string) error         { return nil }
 
 // Option 用于配置 Core 的可选参数。
 type Option func(*Core)
@@ -46,6 +58,9 @@ func NewCore(store Storer, uni uniqueid.Core, protocols map[string]Protocoler, o
 	}
 	for _, opt := range opts {
 		opt(&c)
+	}
+	if c.coverManager == nil {
+		c.coverManager = noopCoverManager{}
 	}
 	return c
 }

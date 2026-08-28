@@ -23,6 +23,7 @@ type Cache struct {
 	ipc.Storer
 
 	devices *conc.Map[string, *gbs.Device]
+	device  DeviceCache
 }
 
 // LoadOrStore implements gbs.MemoryStorer.
@@ -35,8 +36,10 @@ func (c *Cache) Begin() (orm.Tx, error) {
 	return c.Storer.Begin()
 }
 
+// Device 返回设备缓存层实例
+// DeviceCache 构建后不可变，预建一份共享返回，避免每次调用分配新对象
 func (c *Cache) Device() ipc.DeviceStorer {
-	return (*DeviceCache)(c)
+	return &c.device
 }
 
 func (c *Cache) Channel() ipc.ChannelStorer {
@@ -44,10 +47,12 @@ func (c *Cache) Channel() ipc.ChannelStorer {
 }
 
 func NewCache(store ipc.Storer) *Cache {
-	return &Cache{
+	c := &Cache{
 		Storer:  store,
 		devices: &conc.Map[string, *gbs.Device]{},
 	}
+	c.device = DeviceCache{store: store.Device(), cache: c}
+	return c
 }
 
 // LoadDeviceToMemory implements gbs.MemoryStorer.

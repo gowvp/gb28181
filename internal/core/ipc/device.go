@@ -176,10 +176,13 @@ func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
 	var channelIDs []string
 	if c.coverManager != nil {
 		var channels []*Channel
-		c.store.Channel().List(ctx, &channels, &FindChannelInput{
+		if _, err := c.store.Channel().List(ctx, &channels, &FindChannelInput{
 			PagerFilter: web.NewPagerFilterMaxSize(),
 			DID:         id,
-		})
+		}); err != nil {
+			// 查询失败时快照清理降级为跳过，不阻断设备删除，但必须留痕以便排查快照残留
+			slog.ErrorContext(ctx, "收集设备通道ID失败，跳过快照清理", "err", err, "device_id", id)
+		}
 		for _, ch := range channels {
 			channelIDs = append(channelIDs, ch.ID)
 		}
@@ -192,8 +195,14 @@ func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
 	}
 	defer tx.Rollback()
 
-	txDevice, _ := c.store.Device().WithTx(tx)
-	txChannel, _ := c.store.Channel().WithTx(tx)
+	txDevice, err := c.store.Device().WithTx(tx)
+	if err != nil {
+		return nil, reason.ErrDB.Withf(`Device WithTx err[%s]`, err.Error())
+	}
+	txChannel, err := c.store.Channel().WithTx(tx)
+	if err != nil {
+		return nil, reason.ErrDB.Withf(`Channel WithTx err[%s]`, err.Error())
+	}
 
 	if err := txDevice.Delete(ctx, dev); err != nil {
 		return nil, reason.ErrDB.Withf(`Delete err[%s]`, err.Error())
@@ -217,7 +226,9 @@ func (c Core) DeleteDevice(ctx context.Context, id string) (*Device, error) {
 	if c.coverManager != nil && len(channelIDs) > 0 {
 		go func() {
 			for _, cid := range channelIDs {
-				c.coverManager.Remove(cid)
+				if err := c.coverManager.Remove(cid); err != nil {
+					slog.ErrorContext(ctx, "清理通道快照失败", "err", err, "channel_id", cid)
+				}
 			}
 		}()
 	}

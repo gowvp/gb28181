@@ -244,7 +244,11 @@ func (c Core) DeleteChannel(ctx context.Context, id string) (*Channel, error) {
 	}
 
 	if c.coverManager != nil {
-		go c.coverManager.Remove(id)
+		go func() {
+			if err := c.coverManager.Remove(id); err != nil {
+				slog.ErrorContext(ctx, "清理通道快照失败", "err", err, "channel_id", id)
+			}
+		}()
 	}
 	return &out, nil
 }
