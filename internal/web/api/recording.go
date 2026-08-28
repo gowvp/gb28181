@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gowvp/owl/internal/conf"
 	"github.com/gowvp/owl/internal/core/recording"
-	"github.com/gowvp/owl/internal/core/recording/store/recordingdb"
+	"github.com/gowvp/owl/internal/core/recording/stores/recordingdb"
 	"github.com/grafov/m3u8"
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/web"

@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gowvp/owl/internal/conf"
 	"github.com/gowvp/owl/internal/core/sms"
-	"github.com/gowvp/owl/internal/core/sms/store/smsdb"
+	"github.com/gowvp/owl/internal/core/sms/stores/smsdb"
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/reason"
 	"github.com/ixugo/goddd/pkg/web"
