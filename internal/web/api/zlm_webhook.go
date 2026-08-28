@@ -312,12 +312,7 @@ func (w WebHookAPI) onRecordMP4(c *gin.Context, in *onRecordMP4Input) (DefaultOu
 	// 与 ZLM 回调的绝对路径 "/opt/.../configs/recordings/..." 匹配失败
 	relativePath := in.FilePath
 	if w.conf.Server.Recording.StorageDir != "" {
-		storageDir := filepath.Clean(w.conf.Server.Recording.StorageDir)
-		if idx := strings.Index(in.FilePath, storageDir); idx >= 0 {
-			relativePath = in.FilePath[idx:]
-		} else {
-			relativePath = in.URL
-		}
+		relativePath = relativeRecordingPath(in.FilePath, filepath.Clean(w.conf.Server.Recording.StorageDir), in.URL)
 	}
 
 	// 计算开始和结束时间
@@ -352,4 +347,19 @@ func (w WebHookAPI) onRecordMP4(c *gin.Context, in *onRecordMP4Input) (DefaultOu
 	}
 
 	return newDefaultOutputOK(), nil
+}
+
+// relativeRecordingPath 从 ZLM 回调的绝对路径中截取以存储目录开头的相对路径。
+// 为什么按路径分隔符对齐匹配：子串匹配会误中 storageDir 为 "recordings" 时的
+// "/data/oldrecordings/x.mp4"，截出错误相对路径；取最右侧出现（LastIndex）
+// 以命中真实存储根；匹配不到时回退 fallback
+func relativeRecordingPath(filePath, storageDir, fallback string) string {
+	sep := string(filepath.Separator)
+	if strings.HasPrefix(filePath, storageDir+sep) {
+		return filePath
+	}
+	if idx := strings.LastIndex(filePath, sep+storageDir+sep); idx >= 0 {
+		return filePath[idx+1:]
+	}
+	return fallback
 }
