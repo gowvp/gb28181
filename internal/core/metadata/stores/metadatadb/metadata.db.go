@@ -75,5 +75,6 @@ func (d MetadataDB) List(ctx context.Context, in *metadata.ListMetadataInput) ([
 
 // Count 统计总数
 func (d MetadataDB) Count(ctx context.Context, in *metadata.ListMetadataInput) (int64, error) {
-	return orm.CountWithContext[metadata.Metadata](ctx, d.db)
+	var count int64
+	return count, d.db.Model(new(metadata.Metadata)).WithContext(ctx).Count(&count).Error
 }
