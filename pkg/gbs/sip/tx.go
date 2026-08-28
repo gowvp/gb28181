@@ -1,6 +1,7 @@
 package sip
 
 import (
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -133,7 +134,12 @@ func (tx *Transaction) receiveResponse(msg *Response) {
 		}
 	}()
 	// logrus.Traceln("receiveResponse tx", tx.Key(), time.Now().Format("2006-01-02 15:04:05"))
-	tx.resp <- msg
+	select {
+	case tx.resp <- msg:
+	default:
+		slog.Warn("事务响应缓冲已满，丢弃响应", "txkey", tx.key)
+		return
+	}
 	tx.active <- 1
 }
 

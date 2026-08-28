@@ -74,3 +74,26 @@ func TestCloseIdempotent(t *testing.T) {
 	tx.Close()
 	tx.Close()
 }
+
+// 验证 resp 缓冲满且无消费者时 receiveResponse 丢弃响应而非阻塞 listen 循环
+func TestReceiveResponseDropsWhenBufferFull(t *testing.T) {
+	ensureActiveTX()
+	tx := NewTransaction("resp-full", nopConn{})
+	defer tx.Close()
+
+	for i := 0; i < cap(tx.resp); i++ {
+		tx.resp <- &Response{}
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tx.receiveResponse(&Response{})
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("receiveResponse 在 resp 缓冲满时阻塞")
+	}
+}
