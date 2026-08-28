@@ -7,6 +7,7 @@ import (
 	"github.com/gowvp/owl/internal/core/config"
 	"github.com/ixugo/goddd/pkg/orm"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var _ config.ConfigStorer = Config{}
@@ -14,53 +15,67 @@ var _ config.ConfigStorer = Config{}
 // Config Related business namespaces
 type Config DB
 
-// NewConfig instance object
-func NewConfig(db *gorm.DB) Config {
-	return Config{db: db}
+// WithTx 返回使用指定事务的 Store 副本
+func (d Config) WithTx(tx orm.Tx) (config.ConfigStorer, error) {
+	return &Config{db: orm.GormDB(tx)}, nil
 }
 
-// List implements config.ConfigStorer.
-func (d Config) List(ctx context.Context, page orm.Pager, opts ...orm.QueryOption) ([]*config.Config, int64, error) {
+// List 分页查询
+func (d Config) List(ctx context.Context, in *config.FindConfigInput) ([]*config.Config, int64, error) {
+	db := d.db.Model(new(config.Config)).WithContext(ctx)
+	if in.Type != "" {
+		db = db.Where("type = ?", in.Type)
+	}
+	var total int64
+	if err := db.Count(&total).Error; err != nil || total <= 0 {
+		return nil, total, err
+	}
 	var bs []*config.Config
-	total, err := orm.FindWithContext(ctx, d.db, &bs, page, opts...)
-	return bs, total, err
+	return bs, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&bs).Error
 }
 
-// Get implements config.ConfigStorer.
-func (d Config) Get(ctx context.Context, model *config.Config, opts ...orm.QueryOption) error {
-	return orm.FirstWithContext(ctx, d.db, model, opts...)
+// GetByID 按主键查询单条
+func (d Config) GetByID(ctx context.Context, id string) (*config.Config, error) {
+	if id == "" {
+		panic("config: GetByID called with empty ID")
+	}
+	model := config.Config{ID: id}
+	if err := d.db.WithContext(ctx).Take(&model).Error; err != nil {
+		return nil, err
+	}
+	return &model, nil
 }
 
-// Create implements config.ConfigStorer.
+// Create 创建
 func (d Config) Create(ctx context.Context, model *config.Config) error {
 	return d.db.WithContext(ctx).Create(model).Error
 }
 
-// Update implements config.ConfigStorer.
-func (d Config) Update(ctx context.Context, model *config.Config, changeFn func(*config.Config), opts ...orm.QueryOption) error {
-	return orm.UpdateWithContext(ctx, d.db, model, changeFn, opts...)
-}
-
-// Delete implements config.ConfigStorer.
-func (d Config) Delete(ctx context.Context, model *config.Config, opts ...orm.QueryOption) error {
-	return orm.DeleteWithContext(ctx, d.db, model, opts...)
-}
-
-func (d Config) Session(ctx context.Context, changeFns ...func(*gorm.DB) error) error {
+// Update 原子更新：SELECT FOR UPDATE + changeFn + Save
+func (d Config) Update(ctx context.Context, model *config.Config, changeFn func(*config.Config) error) error {
+	if model.ID == "" {
+		panic("config: Update called with empty ID")
+	}
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, fn := range changeFns {
-			if err := fn(tx); err != nil {
-				return err
-			}
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Take(model).Error; err != nil {
+			return err
 		}
-		return nil
+		if err := changeFn(model); err != nil {
+			return err
+		}
+		return tx.Save(model).Error
 	})
 }
 
-func (d Config) UpdateWithSession(tx *gorm.DB, model *config.Config, changeFn func(b *config.Config) error, opts ...orm.QueryOption) error {
-	return orm.UpdateWithSession(tx, model, changeFn, opts...)
+// Delete 幂等删除
+func (d Config) Delete(ctx context.Context, model *config.Config) error {
+	if model.ID == "" {
+		panic("config: Delete called with empty ID")
+	}
+	return d.db.WithContext(ctx).Clauses(clause.Returning{}).Delete(model).Error
 }
 
+// FirstOrCreate 首次插入或返回已有记录
 func (d Config) FirstOrCreate(model *config.Config) error {
 	return d.db.FirstOrCreate(model).Error
 }

@@ -10,18 +10,18 @@ import (
 	"github.com/jinzhu/copier"
 )
 
-// ConfigStorer Instantiation interface
+// ConfigStorer 配置实体持久化接口
 type ConfigStorer interface {
-	List(context.Context, orm.Pager, ...orm.QueryOption) ([]*Config, int64, error)
-	Get(context.Context, *Config, ...orm.QueryOption) error
+	WithTx(orm.Tx) (ConfigStorer, error)
 	Create(context.Context, *Config) error
-	Update(context.Context, *Config, func(*Config), ...orm.QueryOption) error
-	Delete(context.Context, *Config, ...orm.QueryOption) error
-
+	Update(context.Context, *Config, func(*Config) error) error
+	Delete(context.Context, *Config) error
+	List(context.Context, *FindConfigInput) ([]*Config, int64, error)
+	GetByID(context.Context, string) (*Config, error)
 	FirstOrCreate(*Config) error
 }
 
-// ListConfigs Paginated search
+// ListConfigs 分页查询
 func (c Core) ListConfigs(ctx context.Context, in *FindConfigInput) ([]*Config, int64, error) {
 	items, total, err := c.store.Config().List(ctx, in)
 	if err != nil {
@@ -30,19 +30,19 @@ func (c Core) ListConfigs(ctx context.Context, in *FindConfigInput) ([]*Config, 
 	return items, total, nil
 }
 
-// GetConfig Query a single object
-func (c Core) GetConfig(ctx context.Context, id int) (*Config, error) {
-	var out Config
-	if err := c.store.Config().Get(ctx, &out, orm.Where("id=?", id)); err != nil {
+// GetConfig 按 ID 查询
+func (c Core) GetConfig(ctx context.Context, id string) (*Config, error) {
+	out, err := c.store.Config().GetByID(ctx, id)
+	if err != nil {
 		if orm.IsErrRecordNotFound(err) {
 			return nil, reason.ErrNotFound.Withf(`Get err[%s]`, err.Error())
 		}
 		return nil, reason.ErrDB.Withf(`Get err[%s]`, err.Error())
 	}
-	return &out, nil
+	return out, nil
 }
 
-// CreateConfig Insert into database
+// CreateConfig 创建配置
 func (c Core) CreateConfig(ctx context.Context, in *AddConfigInput) (*Config, error) {
 	var out Config
 	if err := copier.Copy(&out, in); err != nil {
@@ -54,23 +54,21 @@ func (c Core) CreateConfig(ctx context.Context, in *AddConfigInput) (*Config, er
 	return &out, nil
 }
 
-// UpdateConfig Update object information
-func (c Core) UpdateConfig(ctx context.Context, in *EditConfigInput, id int) (*Config, error) {
-	var out Config
-	if err := c.store.Config().Update(ctx, &out, func(b *Config) {
-		if err := copier.Copy(b, in); err != nil {
-			slog.ErrorContext(ctx, "Copy", "err", err)
-		}
-	}, orm.Where("id=?", id)); err != nil {
+// UpdateConfig 更新配置
+func (c Core) UpdateConfig(ctx context.Context, in *EditConfigInput, id string) (*Config, error) {
+	out := Config{ID: id}
+	if err := c.store.Config().Update(ctx, &out, func(b *Config) error {
+		return copier.Copy(b, in)
+	}); err != nil {
 		return nil, reason.ErrDB.Withf(`Update err[%s]`, err.Error())
 	}
 	return &out, nil
 }
 
-// DeleteConfig Delete object
-func (c Core) DeleteConfig(ctx context.Context, id int) (*Config, error) {
-	var out Config
-	if err := c.store.Config().Delete(ctx, &out, orm.Where("id=?", id)); err != nil {
+// DeleteConfig 删除配置
+func (c Core) DeleteConfig(ctx context.Context, id string) (*Config, error) {
+	out := Config{ID: id}
+	if err := c.store.Config().Delete(ctx, &out); err != nil {
 		return nil, reason.ErrDB.Withf(`Delete err[%s]`, err.Error())
 	}
 	return &out, nil

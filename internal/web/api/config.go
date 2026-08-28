@@ -26,12 +26,12 @@ func NewConfigAPI(db *gorm.DB, conf *conf.Bootstrap) ConfigAPI {
 
 // configIDInput 配置 ID 路径参数
 type configIDInput struct {
-	ID int `uri:"id" binding:"required"`
+	ID string `uri:"id" binding:"required"`
 }
 
 // updateConfigInput 更新配置的请求参数（路径 ID + 请求体）
 type updateConfigInput struct {
-	ID int `uri:"id" binding:"required"`
+	ID string `uri:"id" binding:"required"`
 	config.EditConfigInput
 }
 
