@@ -440,7 +440,7 @@ func scanDateDirs(root string) []dateDirEntry {
 			if !e.IsDir() {
 				continue
 			}
-			t, err := time.Parse("2006-01-02", e.Name())
+			t, err := time.ParseInLocation("2006-01-02", e.Name(), time.Local)
 			if err != nil {
 				scan(filepath.Join(dir, e.Name()))
 				continue
@@ -502,7 +502,13 @@ func (c Core) cleanupDiskByFilesystem(absStorageDir string) {
 	})
 
 	slog.Info("数据库无可删录像，启动文件系统级磁盘清理", "date_dirs", len(dirs))
+	// 今日目录可能正在录制，删除后写入句柄指向已 unlink 的 inode，空间释放不掉且录像全丢，必须跳过
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 	for _, d := range dirs {
+		if !d.date.Before(todayStart) {
+			continue
+		}
 		usage, err := getDiskUsage(absStorageDir)
 		if err != nil || usage < c.conf.DiskUsageThreshold {
 			break
