@@ -240,9 +240,10 @@ func (c Core) cleanupByDiskUsage() bool {
 	}
 
 	// DB 已无可删录像但磁盘仍超标时，按文件系统最旧优先删除孤儿目录
+	var fsDeleted bool
 	if !reachedMax {
 		if u, e := getDiskUsage(absStorageDir); e == nil && u >= c.conf.DiskUsageThreshold {
-			c.cleanupDiskByFilesystem(absStorageDir)
+			fsDeleted = c.cleanupDiskByFilesystem(absStorageDir)
 		}
 	}
 
@@ -265,7 +266,17 @@ func (c Core) cleanupByDiskUsage() bool {
 
 	// 返回磁盘是否仍超标，供调用方决定是否加速重试
 	finalUsage, err := getDiskUsage(absStorageDir)
-	return err == nil && finalUsage >= c.conf.DiskUsageThreshold
+	stillExceeded := err == nil && finalUsage >= c.conf.DiskUsageThreshold
+	// 本轮零进展（无可删录像、无可删目录）时重试无意义，
+	// 退出加速重试避免告警轰炸，交由常规周期再查
+	if stillExceeded && deletedCount == 0 && failedCount == 0 && !fsDeleted {
+		slog.Warn("磁盘超标但已无可删录像或过期目录，退出加速重试",
+			"current_usage", finalUsage,
+			"threshold", c.conf.DiskUsageThreshold,
+		)
+		return false
+	}
+	return stillExceeded
 }
 
 // markNextDeletionCandidates 预标记即将被删除的录像
@@ -495,10 +506,11 @@ func (c Core) cleanupOrphanDirs() {
 
 // cleanupDiskByFilesystem 文件系统级磁盘清理兜底
 // 当数据库中已无可删录像但磁盘仍超标时，直接按日期目录从旧到新逐个删除
-func (c Core) cleanupDiskByFilesystem(absStorageDir string) {
+// 返回是否实际删除了目录，供调用方判断本轮清理有无进展
+func (c Core) cleanupDiskByFilesystem(absStorageDir string) bool {
 	dirs := scanDateDirs(absStorageDir)
 	if len(dirs) == 0 {
-		return
+		return false
 	}
 
 	slices.SortFunc(dirs, func(a, b dateDirEntry) int {
@@ -509,6 +521,7 @@ func (c Core) cleanupDiskByFilesystem(absStorageDir string) {
 	// 今日目录可能正在录制，删除后写入句柄指向已 unlink 的 inode，空间释放不掉且录像全丢，必须跳过
 	now := time.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+	var deleted bool
 	for _, d := range dirs {
 		if !d.date.Before(todayStart) {
 			continue
@@ -521,9 +534,11 @@ func (c Core) cleanupDiskByFilesystem(absStorageDir string) {
 			slog.Warn("文件系统磁盘清理: 删除目录失败", "path", d.path, "err", err)
 			continue
 		}
+		deleted = true
 		slog.Info("文件系统磁盘清理: 删除目录", "path", d.path, "date", d.date.Format("2006-01-02"))
 	}
 	cleanupEmptyDirs(absStorageDir)
+	return deleted
 }
 
 // cleanupEmptyDirs 递归删除空目录
