@@ -294,8 +294,9 @@ func (uc *Usecase) verifyPlayToken(c *gin.Context, path string) error {
 	secret := uc.Conf.Server.HTTP.JwtSecret + "_play"
 	claims, err := web.ParseToken(tokenStr, secret)
 	if err != nil {
-		if errors.Is(err, jwt.ErrSignatureInvalid) {
-			return fmt.Errorf("无效的播放 token")
+		// 区分过期与其他无效，便于客户端提示用户重新获取播放地址
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return fmt.Errorf("播放 token 已过期")
 		}
 		return fmt.Errorf("无效的播放 token")
 	}

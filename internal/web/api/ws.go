@@ -58,7 +58,7 @@ func registerWS(r *gin.Engine, jwtSecret string) {
 		}
 		claims, err := web.ParseToken(data.Token, jwtSecret)
 		if err != nil {
-			if errors.Is(err, jwt.ErrSignatureInvalid) {
+			if errors.Is(err, jwt.ErrTokenExpired) {
 				return "", fmt.Errorf("expired token")
 			}
 			return "", fmt.Errorf("invalid token")

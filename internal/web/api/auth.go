@@ -39,8 +39,9 @@ func AuthMiddleware(secret string, authURL string, handler ...web.HandlerOption)
 		if len(auth) > len(prefix) && strings.EqualFold(auth[:len(prefix)], prefix) {
 			tokenStr := auth[len(prefix):]
 			claims, err := web.ParseToken(tokenStr, secret)
-			if err != nil && errors.Is(err, jwt.ErrSignatureInvalid) {
-				web.AbortWithStatusJSON(c, reason.ErrUnauthorizedToken.WithMsg("无效的 token"))
+			if err != nil && errors.Is(err, jwt.ErrTokenExpired) {
+				// 过期 token 直接要求重新登录，不降级到 authURL，防止第三方鉴权放行过期凭证
+				web.AbortWithStatusJSON(c, reason.ErrUnauthorized.WithMsg("请重新登录"))
 				return
 			}
 			if err == nil {
