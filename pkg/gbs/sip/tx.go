@@ -94,7 +94,7 @@ func (tx *Transaction) GetResponse() *Response {
 		if res == nil {
 			return res
 		}
-		tx.active <- 2
+		tx.sendActive(2)
 		// logrus.Traceln("response tx", tx.key, time.Now().Format("2006-01-02 15:04:05"))
 		if res.StatusCode() == http.StatusContinue || res.statusCode == http.StatusSwitchingProtocols {
 			// Trying and Dialog Establishement 等待下一个返回
@@ -102,6 +102,16 @@ func (tx *Transaction) GetResponse() *Response {
 		}
 		return res
 	}
+}
+
+// sendActive 通知 watch 重置空闲计时
+// 为什么加 recover: watch 超时分支会并发 Close 关闭 active，
+// 响应恰好在关闭后到达时，向已关闭 channel 发送会 panic，此处兜底
+func (tx *Transaction) sendActive(v int) {
+	defer func() {
+		_ = recover()
+	}()
+	tx.active <- v
 }
 
 // Close Close
