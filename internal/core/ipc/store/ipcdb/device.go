@@ -5,6 +5,7 @@ import (
 
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/ixugo/goddd/pkg/orm"
+	"github.com/ixugo/goddd/pkg/reason"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -29,7 +30,7 @@ func (d DeviceDB) WithTx(tx orm.Tx) (ipc.DeviceStorer, error) {
 // GetByID 按主键查询单条记录
 func (d DeviceDB) GetByID(ctx context.Context, id string) (*ipc.Device, error) {
 	if id == "" {
-		panic("device: GetByID called with empty ID")
+		return nil, reason.ErrBadRequest.WithMsg("设备 ID 不能为空")
 	}
 	var model ipc.Device
 	if err := d.db.WithContext(ctx).Where("id = ?", id).Take(&model).Error; err != nil {
@@ -55,7 +56,7 @@ func (d DeviceDB) Create(ctx context.Context, model *ipc.Device) error {
 // Update 原子更新：SELECT FOR UPDATE + changeFn + Save
 func (d DeviceDB) Update(ctx context.Context, model *ipc.Device, changeFn func(*ipc.Device) error) error {
 	if model.ID == "" {
-		panic("device: Update called with empty ID")
+		return reason.ErrBadRequest.WithMsg("设备 ID 不能为空")
 	}
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Take(model).Error; err != nil {
@@ -71,7 +72,7 @@ func (d DeviceDB) Update(ctx context.Context, model *ipc.Device, changeFn func(*
 // Delete 幂等删除
 func (d DeviceDB) Delete(ctx context.Context, model *ipc.Device) error {
 	if model.ID == "" {
-		panic("device: Delete called with empty ID")
+		return reason.ErrBadRequest.WithMsg("设备 ID 不能为空")
 	}
 	return d.db.WithContext(ctx).Clauses(clause.Returning{}).Delete(model).Error
 }

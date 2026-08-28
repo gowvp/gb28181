@@ -280,3 +280,19 @@ func TestChannelWithTx(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// 验证空 ID 返回参数错误而非 panic
+func TestChannelEmptyID(t *testing.T) {
+	store := ChannelDB{}
+	ctx := context.Background()
+
+	if _, err := store.GetByID(ctx, ""); err == nil {
+		t.Fatal("GetByID 空 ID 应返回错误")
+	}
+	if err := store.Update(ctx, &ipc.Channel{}, func(*ipc.Channel) error { return nil }); err == nil {
+		t.Fatal("Update 空 ID 应返回错误")
+	}
+	if err := store.Delete(ctx, &ipc.Channel{}); err == nil {
+		t.Fatal("Delete 空 ID 应返回错误")
+	}
+}

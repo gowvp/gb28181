@@ -8,6 +8,7 @@ import (
 	"github.com/gowvp/owl/internal/core/bz"
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/ixugo/goddd/pkg/orm"
+	"github.com/ixugo/goddd/pkg/reason"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -32,7 +33,7 @@ func (d ChannelDB) WithTx(tx orm.Tx) (ipc.ChannelStorer, error) {
 // GetByID 按主键查询单条记录
 func (d ChannelDB) GetByID(ctx context.Context, id string) (*ipc.Channel, error) {
 	if id == "" {
-		panic("channel: GetByID called with empty ID")
+		return nil, reason.ErrBadRequest.WithMsg("通道 ID 不能为空")
 	}
 	var model ipc.Channel
 	if err := d.db.WithContext(ctx).Where("id = ?", id).Take(&model).Error; err != nil {
@@ -76,7 +77,7 @@ func (d ChannelDB) Create(ctx context.Context, model *ipc.Channel) error {
 // Update 原子更新：SELECT FOR UPDATE + changeFn + Save
 func (d ChannelDB) Update(ctx context.Context, model *ipc.Channel, changeFn func(*ipc.Channel) error) error {
 	if model.ID == "" {
-		panic("channel: Update called with empty ID")
+		return reason.ErrBadRequest.WithMsg("通道 ID 不能为空")
 	}
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Take(model).Error; err != nil {
@@ -92,7 +93,7 @@ func (d ChannelDB) Update(ctx context.Context, model *ipc.Channel, changeFn func
 // Delete 幂等删除
 func (d ChannelDB) Delete(ctx context.Context, model *ipc.Channel) error {
 	if model.ID == "" {
-		panic("channel: Delete called with empty ID")
+		return reason.ErrBadRequest.WithMsg("通道 ID 不能为空")
 	}
 	return d.db.WithContext(ctx).Clauses(clause.Returning{}).Delete(model).Error
 }

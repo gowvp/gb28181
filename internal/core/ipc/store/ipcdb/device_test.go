@@ -197,3 +197,19 @@ func TestDeviceWithTx(t *testing.T) {
 		t.Fatal("expected not found after tx delete")
 	}
 }
+
+// 验证空 ID 返回参数错误而非 panic
+func TestDeviceEmptyID(t *testing.T) {
+	store := DeviceDB{}
+	ctx := context.Background()
+
+	if _, err := store.GetByID(ctx, ""); err == nil {
+		t.Fatal("GetByID 空 ID 应返回错误")
+	}
+	if err := store.Update(ctx, &ipc.Device{}, func(*ipc.Device) error { return nil }); err == nil {
+		t.Fatal("Update 空 ID 应返回错误")
+	}
+	if err := store.Delete(ctx, &ipc.Device{}); err == nil {
+		t.Fatal("Delete 空 ID 应返回错误")
+	}
+}
