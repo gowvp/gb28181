@@ -64,9 +64,13 @@ func (d MetadataDB) Delete(ctx context.Context, model *metadata.Metadata) error 
 
 // List 分页查询
 func (d MetadataDB) List(ctx context.Context, in *metadata.ListMetadataInput) ([]*metadata.Metadata, int64, error) {
+	db := d.db.Model(new(metadata.Metadata)).WithContext(ctx)
+	var total int64
+	if err := db.Count(&total).Error; err != nil || total <= 0 {
+		return nil, total, err
+	}
 	var out []*metadata.Metadata
-	total, err := orm.ListWithContext(ctx, d.db, &out, in)
-	return out, total, err
+	return out, total, db.Limit(in.Limit()).Offset(in.Offset()).Find(&out).Error
 }
 
 // Count 统计总数
