@@ -116,7 +116,7 @@ func (w WebHookAPI) onPublish(c *gin.Context, in *onPublishInput) (*onPublishOut
 	// 解析参数
 	params, err := url.ParseQuery(in.Params)
 	if err != nil {
-		return &onPublishOutput{DefaultOutput: DefaultOutput{Code: 1, Msg: err.Error()}}, nil
+		return &onPublishOutput{Code: 1, Msg: err.Error()}, nil
 	}
 
 	// 将 url.Values 转换为 map[string]string
@@ -131,10 +131,10 @@ func (w WebHookAPI) onPublish(c *gin.Context, in *onPublishInput) (*onPublishOut
 	// 调用协议适配器的 OnPublish 方法
 	allowed, err := publisher.OnPublish(ctx, in.App, in.Stream, paramsMap)
 	if err != nil {
-		return &onPublishOutput{DefaultOutput: DefaultOutput{Code: 1, Msg: err.Error()}}, nil
+		return &onPublishOutput{Code: 1, Msg: err.Error()}, nil
 	}
 	if !allowed {
-		return &onPublishOutput{DefaultOutput: DefaultOutput{Code: 1, Msg: "鉴权失败"}}, nil
+		return &onPublishOutput{Code: 1, Msg: "鉴权失败"}, nil
 	}
 
 	return &onPublishOutput{DefaultOutput: newDefaultOutputOK()}, nil

@@ -173,9 +173,9 @@ func (a RecordingAPI) channelPlaylist(c *gin.Context) {
 	// 获取时间范围内的录像列表（需要完整路径信息）
 	ctx := web.WithContext(c.Request)
 	recordings, _, err := a.recordingCore.ListRecordings(ctx, &recording.FindRecordingInput{
-		CID:         cid,
-		PagerFilter: web.PagerFilter{Page: 1, Size: 10000},
-		DateFilter:  web.DateFilter{StartMs: startMs, EndMs: endMs},
+		CID:  cid,
+		Page: 1, Size: 10000,
+		StartMs: startMs, EndMs: endMs,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"code": 1, "msg": err.Error()})

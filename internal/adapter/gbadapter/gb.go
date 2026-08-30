@@ -108,10 +108,9 @@ func (a *Adapter) PTZControl(ctx context.Context, device *ipc.Device, channel *i
 // hikPTZControlStructured 海康摄像头结构化 PTZ 控制
 func (a *Adapter) hikPTZControlStructured(device *ipc.Device, channel *ipc.Channel, cmd ipc.PTZCommand) error {
 	var code string
-	speed := int(cmd.Speed * 8) // 将 0-1 转换为 1-8
-	if speed < 1 {
-		speed = 1
-	}
+	speed := max(
+		// 将 0-1 转换为 1-8
+		int(cmd.Speed*8), 1)
 	if speed > 8 {
 		speed = 8
 	}

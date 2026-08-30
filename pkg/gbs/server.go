@@ -173,7 +173,8 @@ func (s *Server) startTickerCheck() {
 
 			// 心跳超时或连接丢失，判定设备离线
 			if sub := now.Sub(dev.LastKeepaliveAt); sub >= timeout || dev.conn == nil {
-				slog.Info("device offline detected",
+				slog.Info(
+					"device offline detected",
 					"device_id", key,
 					"last_keepalive", dev.LastKeepaliveAt,
 					"timeout", timeout,
@@ -220,7 +221,7 @@ func LoadSYSInfo() {
 	config = m.MConfig
 	_activeDevices = ActiveDevices{sync.Map{}}
 
-	StreamList = streamsList{&sync.Map{}, &sync.Map{}, 0}
+	// StreamList = streamsList{&sync.Map{}, &sync.Map{}, 0}
 	_recordList = &sync.Map{}
 	RecordList = apiRecordList{items: map[string]*apiRecordItem{}, l: sync.RWMutex{}}
 

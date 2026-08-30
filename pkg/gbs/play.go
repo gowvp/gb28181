@@ -12,7 +12,6 @@ import (
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/internal/core/sms"
 	wsnotify "github.com/gowvp/owl/internal/notify"
-	"github.com/gowvp/owl/pkg/gbs/m"
 	"github.com/gowvp/owl/pkg/gbs/sip"
 	"github.com/gowvp/owl/pkg/zlm"
 	sdp "github.com/panjjo/gosdp"
@@ -527,40 +526,40 @@ func (g *GB28181API) sipPlayPush2(ch *Channel, in *PlayInput, port int, stream *
 // 	return data, err
 // }
 
-// sip 停止播放
-func SipStopPlay(ssrc string) {
-	zlmCloseStream(ssrc)
-	data, ok := StreamList.Response.Load(ssrc)
-	if !ok {
-		return
-	}
-	play := data.(*Streams)
-	if play.StreamType == m.StreamTypePush {
-		// 推流，需要发送关闭请求
-		resp := play.Resp
-		u, ok := _activeDevices.Load(play.DeviceID)
-		if !ok {
-			return
-		}
-		user := u.(Devices)
-		req := sip.NewRequestFromResponse(sip.MethodBYE, resp)
-		req.SetDestination(user.source)
-		tx, err := svr.Request(req)
-		if err != nil {
-			// logrus.Warningln("sipStopPlay bye fail.id:", play.DeviceID, play.ChannelID, "err:", err)
-		}
-		_, err = sipResponse(tx)
-		if err != nil {
-			// logrus.Warnln("sipStopPlay response fail", err)
-			play.Msg = err.Error()
-		} else {
-			play.Status = 1
-			play.Stop = true
-		}
-		// db.Save(db.DBClient, play)
-	}
-	StreamList.Response.Delete(ssrc)
-	if play.T == 0 {
-		StreamList.Succ.Delete(play.ChannelID)
-	}
-}
+// // sip 停止播放
+// func SipStopPlay(ssrc string) {
+// 	zlmCloseStream(ssrc)
+// 	data, ok := StreamList.Response.Load(ssrc)
+// 	if !ok {
+// 		return
+// 	}
+// 	play := data.(*Streams)
+// 	if play.StreamType == m.StreamTypePush {
+// 		// 推流，需要发送关闭请求
+// 		resp := play.Resp
+// 		u, ok := _activeDevices.Load(play.DeviceID)
+// 		if !ok {
+// 			return
+// 		}
+// 		user := u.(Devices)
+// 		req := sip.NewRequestFromResponse(sip.MethodBYE, resp)
+// 		req.SetDestination(user.source)
+// 		tx, err := svr.Request(req)
+// 		if err != nil {
+// 			// logrus.Warningln("sipStopPlay bye fail.id:", play.DeviceID, play.ChannelID, "err:", err)
+// 		}
+// 		_, err = sipResponse(tx)
+// 		if err != nil {
+// 			// logrus.Warnln("sipStopPlay response fail", err)
+// 			play.Msg = err.Error()
+// 		} else {
+// 			play.Status = 1
+// 			play.Stop = true
+// 		}
+// 		// db.Save(db.DBClient, play)
+// 	}
+// 	StreamList.Response.Delete(ssrc)
+// 	if play.T == 0 {
+// 		StreamList.Succ.Delete(play.ChannelID)
+// 	}
+// }

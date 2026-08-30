@@ -6,7 +6,6 @@ import (
 
 	"github.com/gowvp/owl/internal/core/recording"
 	"github.com/gowvp/owl/internal/core/sms"
-	"github.com/gowvp/owl/pkg/zlm"
 )
 
 var _ recording.PlayProvider = (*PlayAdapter)(nil)
@@ -33,12 +32,10 @@ func (a *PlayAdapter) TriggerStream(ctx context.Context, info recording.ChannelI
 	rtspURL := fmt.Sprintf("rtsp://127.0.0.1:%d/%s/%s", ms.Ports.RTSP, info.App, info.Stream)
 
 	_, err = a.smsCore.GetSnapshot(ms, sms.GetSnapRequest{
-		GetSnapRequest: zlm.GetSnapRequest{
-			URL:        rtspURL,
-			TimeoutSec: 30,
-			ExpireSec:  1,
-		},
-		Stream: info.ID,
+		URL:        rtspURL,
+		TimeoutSec: 30,
+		ExpireSec:  1,
+		Stream:     info.ID,
 	})
 	return err
 }

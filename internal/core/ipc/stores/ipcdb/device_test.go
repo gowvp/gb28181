@@ -157,7 +157,7 @@ func TestDeviceList(t *testing.T) {
 	}
 
 	// 分页
-	page1, total, err := store.List(ctx, &ipc.FindDeviceInput{PagerFilter: web.PagerFilter{Size: 2}})
+	page1, total, err := store.List(ctx, &ipc.FindDeviceInput{Size: 2})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -98,7 +98,7 @@ func (c Core) GetTimeline(ctx context.Context, in *TimelineInput) ([]TimeRange, 
 	endAt := in.EndAt()
 	startAt := in.StartAt()
 	recordings, _, err := c.store.Recording().List(ctx, &FindRecordingInput{
-		PagerFilter:     web.PagerFilter{Page: 1, Size: 1000},
+		Page: 1, Size: 1000,
 		CID:             in.CID,
 		StartedAtBefore: &endAt,
 		EndedAtAfter:    &startAt,
@@ -164,7 +164,7 @@ func (c Core) GetMonthlyStats(ctx context.Context, in *MonthlyStatsInput) (*Mont
 	daysInMonth := lastDay.Day()
 
 	recordings, _, err := c.store.Recording().List(ctx, &FindRecordingInput{
-		PagerFilter:     web.PagerFilter{Page: 1, Size: 10000},
+		Page: 1, Size: 10000,
 		CID:             in.CID,
 		StartedAtAfter:  &firstDay,
 		StartedAtBefore: &lastDay,

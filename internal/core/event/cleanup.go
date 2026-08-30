@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ixugo/goddd/pkg/system"
-	"github.com/ixugo/goddd/pkg/web"
 )
 
 // StartCleanupWorker 启动定时清理协程，每天凌晨 3 点执行一次清理
@@ -45,8 +44,8 @@ func (c Core) cleanupExpiredEvents(days int) {
 	for {
 		var events []*Event
 		in := &ListEventInput{
-			PagerFilter: web.PagerFilter{Page: 1, Size: batchSize},
-			BeforeAt:    cutoffTime,
+			Page: 1, Size: batchSize,
+			BeforeAt: cutoffTime,
 		}
 		events, _, err := c.store.Event().List(ctx, in)
 		if err != nil {

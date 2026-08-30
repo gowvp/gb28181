@@ -13,7 +13,6 @@ import (
 	"github.com/gowvp/owl/internal/notify"
 	"github.com/ixugo/goddd/pkg/orm"
 	"github.com/ixugo/goddd/pkg/system"
-	"github.com/ixugo/goddd/pkg/web"
 	"gorm.io/gorm"
 )
 
@@ -96,7 +95,7 @@ func (c Core) cleanupExpiredRecordings() {
 	totalDeleted, filesDeleted, freedBytes, failedFiles := c.batchDeleteRecordings(ctx,
 		"expired",
 		&FindRecordingInput{
-			PagerFilter:     web.PagerFilter{Page: 1, Size: 100},
+			Page: 1, Size: 100,
 			StartedAtBefore: &cutoffTime,
 		},
 	)
@@ -152,7 +151,7 @@ func (c Core) cleanupByDiskUsage() bool {
 	reachedMax := false
 
 	// 持续删除最旧录像，每批删完重新检查磁盘，直到达标或无录像可删
-	for batch := 0; batch < maxBatches; batch++ {
+	for batch := range maxBatches {
 		usage, err = getDiskUsage(absStorageDir)
 		if err != nil || usage < c.conf.DiskUsageThreshold {
 			break
@@ -160,8 +159,8 @@ func (c Core) cleanupByDiskUsage() bool {
 
 		var oldestRecordings []*Recording
 		oldestRecordings, _, err = c.store.Recording().List(ctx, &FindRecordingInput{
-			PagerFilter: web.PagerFilter{Page: 1, Size: batchSize},
-			OrderBy:     "started_at ASC",
+			Page: 1, Size: batchSize,
+			OrderBy: "started_at ASC",
 		})
 		if err != nil || len(oldestRecordings) == 0 {
 			break
@@ -291,7 +290,7 @@ func (c Core) markNextDeletionCandidates(ctx context.Context, targetSize int64) 
 
 	deleteFlagFalse := false
 	candidates, _, err := c.store.Recording().List(ctx, &FindRecordingInput{
-		PagerFilter:  web.PagerFilter{Page: 1, Size: 200},
+		Page: 1, Size: 200,
 		DeleteFlagEq: &deleteFlagFalse,
 		OrderBy:      "started_at ASC",
 	})

@@ -178,7 +178,7 @@ func TestChannelList(t *testing.T) {
 
 	// 分页
 	page1, total, err := store.List(ctx, &ipc.FindChannelInput{
-		PagerFilter: web.PagerFilter{Size: 2},
+		Size: 2,
 	})
 	if err != nil {
 		t.Fatal(err)

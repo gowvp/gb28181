@@ -31,10 +31,10 @@ func (c Core) ListChannelsForDevice(ctx context.Context, in *FindDeviceInput) ([
 	for _, item := range items {
 		const size = 5
 		childInput := &FindChannelInput{
-			PagerFilter: web.PagerFilter{Size: size},
-			DID:         item.ID,
-			Key:         in.Key,
-			OrderBy:     "created_at ASC",
+			Size:    size,
+			DID:     item.ID,
+			Key:     in.Key,
+			OrderBy: "created_at ASC",
 		}
 		children, _, err := c.store.Channel().List(ctx, childInput)
 		if err != nil {

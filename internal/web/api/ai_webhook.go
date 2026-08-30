@@ -133,8 +133,8 @@ func (a *AIWebhookAPI) syncAITasks(ctx context.Context, smsCore sms.Core) {
 
 	// 查询所有在线通道
 	channels, _, err := a.ipcCore.ListChannels(ctx, &ipc.FindChannelInput{
-		PagerFilter: web.PagerFilter{Page: 1, Size: 999},
-		IsOnline:    "true",
+		Page: 1, Size: 999,
+		IsOnline: "true",
 	})
 	if err != nil {
 		a.log.ErrorContext(ctx, "sync ai tasks: find channels failed", "err", err)

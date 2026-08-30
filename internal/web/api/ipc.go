@@ -482,12 +482,10 @@ func (a IPCAPI) play(c *gin.Context, in *channelIDInput) (*playOutput, error) {
 			time.Sleep(3 * time.Second)
 
 			body, err := a.uc.SMSAPI.smsCore.GetSnapshot(svr, sms.GetSnapRequest{
-				GetSnapRequest: zlm.GetSnapRequest{
-					URL:        rtsp,
-					TimeoutSec: 10,
-					ExpireSec:  15,
-				},
-				Stream: channelID,
+				URL:        rtsp,
+				TimeoutSec: 10,
+				ExpireSec:  15,
+				Stream:     channelID,
 			})
 			if err != nil {
 				slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)
@@ -674,12 +672,10 @@ func (a IPCAPI) refreshSnapshot(c *gin.Context, in *refreshSnapshotWithIDInput) 
 		}
 
 		img, err := a.uc.SMSAPI.smsCore.GetSnapshot(svr, sms.GetSnapRequest{
-			GetSnapRequest: zlm.GetSnapRequest{
-				URL:        in.URL,
-				TimeoutSec: 10,
-				ExpireSec:  int(in.WithinSeconds),
-			},
-			Stream: channelID,
+			URL:        in.URL,
+			TimeoutSec: 10,
+			ExpireSec:  int(in.WithinSeconds),
+			Stream:     channelID,
 		})
 		if err != nil {
 			slog.ErrorContext(c.Request.Context(), "get snapshot", "err", err)

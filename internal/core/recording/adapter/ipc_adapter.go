@@ -5,7 +5,6 @@ import (
 
 	"github.com/gowvp/owl/internal/core/ipc"
 	"github.com/gowvp/owl/internal/core/recording"
-	"github.com/ixugo/goddd/pkg/web"
 )
 
 var _ recording.IPCProvider = (*IPCAdapter)(nil)
@@ -23,8 +22,8 @@ func NewIPCAdapter(ipcCore ipc.Core) recording.IPCProvider {
 // ListOnlineChannels 查询所有在线通道，包含 RecordMode 供同步逻辑分类
 func (a *IPCAdapter) ListOnlineChannels(ctx context.Context) ([]recording.ChannelInfo, error) {
 	channels, _, err := a.ipcCore.ListChannels(ctx, &ipc.FindChannelInput{
-		PagerFilter: web.PagerFilter{Page: 1, Size: 9999},
-		IsOnline:    "true",
+		Page: 1, Size: 9999,
+		IsOnline: "true",
 	})
 	if err != nil {
 		return nil, err

@@ -215,10 +215,7 @@ func (w *worker) doPost(body []byte) (int, error) {
 // calcDelay 指数退避 + ±25% jitter，上限 maxDelay
 func calcDelay(attempt int) time.Duration {
 	exp := math.Pow(2, float64(attempt))
-	d := time.Duration(float64(baseDelay) * exp)
-	if d > maxDelay {
-		d = maxDelay
-	}
+	d := min(time.Duration(float64(baseDelay)*exp), maxDelay)
 	// jitter: [0.75, 1.25)
 	jitter := 0.75 + rand.Float64()*0.5
 	return time.Duration(float64(d) * jitter)

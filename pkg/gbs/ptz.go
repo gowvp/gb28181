@@ -12,11 +12,11 @@ import (
 )
 
 // ptzSNCounter PTZ 命令序列号计数器（原子操作保证线程安全）
-var ptzSNCounter uint64
+var ptzSNCounter atomic.Uint64
 
 // getNextPTZSN 获取下一个 PTZ 序列号
 func getNextPTZSN() int {
-	return int(atomic.AddUint64(&ptzSNCounter, 1))
+	return int(ptzSNCounter.Add(1))
 }
 
 // PTZControlInfo PTZ 控制附加信息
@@ -30,7 +30,7 @@ type PTZControlRequest struct {
 	CmdType  string         `xml:"CmdType"`  // 命令类型：DeviceControl 或 PTZCmd
 	SN       int            `xml:"SN"`       // 序列号
 	DeviceID string         `xml:"DeviceID"` // 目标设备编码
-	PTZCmd   interface{}    `xml:"PTZCmd"`   // 云台控制码（可以是字符串或结构化对象）
+	PTZCmd   any            `xml:"PTZCmd"`   // 云台控制码（可以是字符串或结构化对象）
 	Info     PTZControlInfo `xml:"Info"`     // 控制信息
 }
 
@@ -144,13 +144,13 @@ func BuildContinuousMove(direction string, speed float64) string {
 	case "zoomin":
 		builder.direction = PTZ_BIT_ZOOM_IN
 		builder.zoomSpeed = speedByte >> 4 // 高4位
-		builder.horzSpeed = 0x00       
-		builder.vertSpeed = 0x00 
+		builder.horzSpeed = 0x00
+		builder.vertSpeed = 0x00
 	case "zoomout":
 		builder.direction = PTZ_BIT_ZOOM_OUT
 		builder.zoomSpeed = speedByte >> 4 // 高4位
-		builder.horzSpeed = 0x00       
-		builder.vertSpeed = 0x00 
+		builder.horzSpeed = 0x00
+		builder.vertSpeed = 0x00
 	default:
 		return ""
 	}

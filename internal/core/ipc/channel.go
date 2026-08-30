@@ -95,8 +95,8 @@ func (c Core) CreateChannel(ctx context.Context, in *AddChannelInput) (*Channel,
 			Type:     in.Type,
 			IsOnline: true,
 			Channels: 1,
-		}
-		newDev.ID = c.uniqueID.UniqueID(getDevicePrefix(in.Type))
+
+			ID: c.uniqueID.UniqueID(getDevicePrefix(in.Type))}
 		newDev.DeviceID = newDev.ID
 
 		if err := c.store.Device().Create(ctx, &newDev); err != nil {
