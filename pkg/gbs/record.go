@@ -3,55 +3,12 @@ package gbs
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/gowvp/owl/pkg/gbs/sip"
 )
-
-// 获取录像文件列表
-func SipRecordList(to *Channels, start, end int64) (*Records, error) {
-	sn := sip.RandInt(100000, 999999)
-	resp := make(chan Records, 1)
-	defer close(resp)
-	device, ok := _activeDevices.Get(to.DeviceID)
-	if !ok {
-		return nil, errors.New("设备不在线")
-	}
-	channelURI, _ := sip.ParseURI(to.URIStr)
-	to.addr = &sip.Address{URI: channelURI}
-	recordKey := fmt.Sprintf("%s%d", to.ChannelID, sn)
-	_recordList.Store(recordKey, recordList{channelid: to.ChannelID, resp: resp, data: [][]int64{}, l: &sync.Mutex{}, s: start, e: end})
-	defer _recordList.Delete(recordKey)
-	hb := sip.NewHeaderBuilder().SetTo(to.addr).SetFrom(_serverDevices.addr).AddVia(&sip.ViaHop{
-		Params: sip.NewParams().Add("branch", sip.String{Str: sip.GenerateBranch()}),
-	}).SetContentType(&sip.ContentTypeXML).SetMethod(sip.MethodMessage)
-	req := sip.NewRequest("", sip.MethodMessage, to.addr.URI, sip.DefaultSipVersion, hb.Build(), sip.GetRecordInfoXML(to.ChannelID, sn, start, end))
-	req.SetDestination(device.source)
-	tx, err := svr.Request(req)
-	if err != nil {
-		return nil, err
-	}
-	response := tx.GetResponse()
-	if response.StatusCode() != http.StatusOK {
-		return nil, errors.New(response.Reason())
-	}
-	tick := time.NewTicker(10 * time.Second)
-	select {
-	case res := <-resp:
-		return &res, nil
-	case <-tick.C:
-		// 10秒未完成返回当前获取到的数据
-		if list, ok := _recordList.Load(recordKey); ok {
-			info := list.(recordList)
-			data := transRecordList(info.data)
-			return &data, nil
-		}
-		return nil, errors.New("获取数据超时")
-	}
-}
 
 // MessageRecordInfoResponse 目录列表
 type MessageRecordInfoResponse struct {

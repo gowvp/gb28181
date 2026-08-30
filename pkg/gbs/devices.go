@@ -14,11 +14,8 @@ import (
 	"github.com/ixugo/goddd/pkg/conc"
 )
 
-var (
-	// sip服务用户信息
-	_serverDevices Devices
-	svr            *sip.Server
-)
+// sip服务用户信息
+var svr *sip.Server
 
 type Device struct {
 	Channels conc.Map[string, *Channel]
@@ -166,22 +163,6 @@ func (c *Channel) init(domain string) {
 	}
 }
 
-func newDevice(network, address string, conn sip.Connection) *Device {
-	if network == "tcp" {
-		return nil
-	}
-
-	raddr, err := net.ResolveUDPAddr(network, address)
-	if err != nil {
-		return nil
-	}
-
-	var dev Device
-	dev.source = raddr
-	dev.conn = conn
-	return &dev
-}
-
 // func NewClient() *Client {
 // 	return &Client{
 // 		devices: conc.Map[string, *Device]{},
@@ -306,40 +287,6 @@ type Channels struct {
 	URL string `json:"url"  gorm:"column:url"`
 
 	addr *sip.Address `gorm:"-"`
-}
-
-// 同步摄像头编码格式
-func SyncDevicesCodec(ssrc, deviceid string) {
-	resp := zlmGetMediaList(zlmGetMediaListReq{streamID: ssrc})
-	if resp.Code != 0 {
-		// logrus.Errorln("syncDevicesCodec fail", ssrc, resp)
-		return
-	}
-	if len(resp.Data) == 0 {
-		// logrus.Errorln("syncDevicesCodec fail", ssrc, "not found data", resp)
-		return
-	}
-	for _, data := range resp.Data {
-		if len(data.Tracks) == 0 {
-			// logrus.Errorln("syncDevicesCodec fail", ssrc, "not found tracks", resp)
-		}
-
-		for _, track := range data.Tracks {
-			if track.Type == 0 {
-				// 视频
-				// device := Channels{DeviceID: deviceid}
-				// if err := db.Get(db.DBClient, &device); err == nil {
-				// 	device.VF = transZLMDeviceVF(track.CodecID)
-				// 	device.Height = track.Height
-				// 	device.Width = track.Width
-				// 	device.FPS = track.FPS
-				// 	db.Save(db.DBClient, &device)
-				// } else {
-				// 	// logrus.Errorln("syncDevicesCodec deviceid not found,deviceid:", deviceid)
-				// }
-			}
-		}
-	}
 }
 
 // 从请求中解析出设备信息
