@@ -36,9 +36,7 @@ func setupRouter(r *gin.Engine, uc *Usecase) {
 	// uc.MediaAPI.uc = uc // 已移除 push 模块
 	const staticPrefix = "/web"
 
-	go stat.LoadTop(system.Getwd(), func(m map[string]any) {
-		_ = m
-	})
+	go stat.LoadTop(system.Getwd())
 	r.Use(
 		web.Recover(),
 		web.Metrics(),

@@ -13,7 +13,7 @@ require (
 	github.com/google/wire v0.7.0
 	github.com/gowvp/onvif v0.0.15
 	github.com/grafov/m3u8 v0.12.1
-	github.com/ixugo/goddd v1.7.10
+	github.com/ixugo/goddd v1.8.1
 	github.com/ixugo/netpulse v0.1.5
 	github.com/jinzhu/copier v0.4.0
 	github.com/panjjo/gosdp v0.0.0-20201029020038-56e3a0ec56ef

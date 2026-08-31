@@ -74,67 +74,50 @@ func GetNetData() []PercentData {
 	return netData.Range()
 }
 
-func LoadTop(path string, fn func(map[string]any)) {
-	ticker := time.NewTicker(50 * time.Millisecond)
+// LoadTop 定时采集 CPU/内存/网络/磁盘指标，写入环形队列供前端轮询。
+// 缓存前一次网络计数器计算速率，避免每轮双次 IOCounters + 1s 阻塞。
+func LoadTop(path string) {
+	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
-	for {
-		<-ticker.C
-		// cpu
+
+	var prevNet []net.IOCountersStat
+	var prevNetTime time.Time
+
+	for range ticker.C {
 		now := orm.Now()
-		cpu, err := cpu.Percent(0, false)
-		if err != nil && err.Error() != `not implemented yet` {
+
+		if cpuPercent, err := cpu.Percent(0, false); err != nil && err.Error() != "not implemented yet" {
 			slog.Error("LoadTop cpu", "err", err)
-		}
-		if len(cpu) > 0 {
-			cpuData.Push(PercentData{Time: now, Used: cpu[0]})
+		} else if len(cpuPercent) > 0 {
+			cpuData.Push(PercentData{Time: now, Used: cpuPercent[0]})
+			currentCPU = cpuPercent[0]
 		}
 
-		// memory
-		mem, err := mem.VirtualMemory()
-		if err != nil && err.Error() != `not implemented yet` {
+		if memStat, err := mem.VirtualMemory(); err != nil && err.Error() != "not implemented yet" {
 			slog.Error("LoadTop VirtualMemory", "err", err)
-		}
-		if mem != nil {
-			memData.Push(PercentData{Time: now, Used: mem.UsedPercent})
+		} else if memStat != nil {
+			memData.Push(PercentData{Time: now, Used: memStat.UsedPercent})
+			currentMem = memStat.UsedPercent
 		}
 
-		// net flow
-		n1, _ := net.IOCounters(false)
-		time.Sleep(1000 * time.Millisecond)
-		n2, _ := net.IOCounters(false)
-		if len(n1) > 0 && len(n2) > 0 {
-			netData.Push(PercentData{
-				Time: now, Up: float64(n2[0].BytesSent-n1[0].BytesSent) * 8,
-				Down: float64(n2[0].BytesRecv-n1[0].BytesRecv) * 8,
-			})
-		}
-		// 当前值统计
-		if mem != nil {
-			currentMem = mem.UsedPercent
-			if len(cpu) > 0 {
-				currentCPU = cpu[0]
+		if currNet, err := net.IOCounters(false); err == nil && len(currNet) > 0 {
+			if len(prevNet) > 0 {
+				elapsed := time.Since(prevNetTime).Seconds()
+				if elapsed > 0 {
+					netData.Push(PercentData{
+						Time: now,
+						Up:   float64(currNet[0].BytesSent-prevNet[0].BytesSent) / elapsed * 8,
+						Down: float64(currNet[0].BytesRecv-prevNet[0].BytesRecv) / elapsed * 8,
+					})
+				}
 			}
+			prevNet = currNet
+			prevNetTime = time.Now()
 		}
 
 		if diskres, err := disk.Usage(path); err == nil {
 			currentMainDisk = diskres.Used
 			totalMainDisk = diskres.Total
 		}
-		fn(map[string]any{
-			"mem": memData.Last(),
-			"cpu": cpuData.Last(),
-			"net": netData.Last(),
-			// "netup":   netUpData.Last(),
-			// "netdown": netDownData.Last(),
-			"disk": []map[string]any{
-				{
-					"name":  path,
-					"used":  currentMainDisk,
-					"total": totalMainDisk,
-				},
-			},
-		})
-
-		ticker.Reset(200 * time.Millisecond)
 	}
 }
